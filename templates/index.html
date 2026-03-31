@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Propilot — Your Bets</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:            #0f0f11;
+  --surface:       #141416;
+  --surface-2:     #18181b;
+  --border:        #222226;
+  --border-2:      #2e2e33;
+  --text-1:        #e4e4e7;
+  --text-2:        #a1a1aa;
+  --text-3:        #71717a;
+  --text-4:        #3f3f46;
+  --accent:        #22d3ee;
+  --accent-dim:    rgba(34,211,238,0.10);
+  --accent-border: rgba(34,211,238,0.28);
+  --green:         #22c55e;
+  --green-dim:     rgba(34,197,94,0.10);
+  --green-border:  rgba(34,197,94,0.25);
+  --red:           #ef4444;
+  --red-dim:       rgba(239,68,68,0.10);
+  --red-border:    rgba(239,68,68,0.25);
+  --amber:         #f59e0b;
+  --pp:            #7c3aed;
+  --pp-border:     rgba(124,58,237,0.38);
+  --pp-glow:       rgba(124,58,237,0.13);
+  --ud:            #d97706;
+  --ud-border:     rgba(217,119,6,0.38);
+  --ud-glow:       rgba(217,119,6,0.12);
+  --r:             6px;
+  --r-sm:          4px;
+  --t:             150ms ease;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--border-2) transparent; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+
+@keyframes pageIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+body {
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  font-size: 13px;
+  animation: pageIn 220ms ease both;
+}
+
+/* ── Prob classes ── */
+.prob-high { color: var(--text-1); }
+.prob-mid  { color: var(--text-1); }
+.prob-norm { color: var(--text-2); }
+.prob-dim  { color: var(--text-4); }
+
+/* ── Topbar ── */
+.topbar {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  height: 40px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+  position: sticky; top: 0; z-index: 200;
+}
+.logo { display: flex; align-items: center; gap: 8px; }
+.logo-mark {
+  width: 28px; height: 28px; background: #18181b;
+  border: 1px solid #2e2e33;
+  border-radius: 7px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.logo-mark svg { width: 16px; height: 16px; }
+.logo-text { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.logo-text .lt-w { color: var(--text-1); }
+.logo-text .lt-c { color: var(--accent); }
+.nav-links { display: flex; align-items: center; gap: 16px; }
+.nav-link {
+  font-size: 12px; font-weight: 500; color: var(--text-3);
+  text-decoration: none; padding-bottom: 2px;
+  border-bottom: 1px solid transparent;
+  transition: color var(--t), border-color var(--t);
+  line-height: 40px;
+}
+.nav-link.active   { color: var(--text-1); border-bottom-color: var(--accent); }
+.nav-link.inactive:hover { color: var(--text-2); }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.live-badge {
+  display: flex; align-items: center; gap: 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--green); background: var(--green-dim);
+  border: 1px solid var(--green-border);
+  padding: 2px 6px; border-radius: var(--r-sm);
+}
+.live-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--green); animation: blink 1.8s ease infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.topbar-ts { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-4); }
+.refresh-badge {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  color: var(--text-4); background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 2px 7px;
+}
+.refresh-badge.stale { color: var(--amber); border-color: rgba(245,158,11,0.4); }
+
+/* ── Layout ── */
+.layout {
+  display: flex;
+  height: calc(100vh - 40px);
+  padding: 12px 16px;
+  gap: 12px;
+}
+
+/* ── Feed panel ── */
+.feed-panel {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.feed-toolbar {
+  padding: 0 14px;
+  height: 40px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0; gap: 12px;
+}
+.feed-title-group { display: flex; align-items: center; gap: 8px; }
+.feed-title  { font-size: 12px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.07em; }
+.feed-count  { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-4); }
+.feed-hint   { font-size: 11px; color: var(--text-4); }
+.downtime-notice { font-size: 10px; color: #3f3f46; font-family: 'JetBrains Mono', monospace; margin-left: 4px; }
+.filter-tabs { display: flex; gap: 2px; }
+.ftab {
+  font-size: 11px; font-weight: 500;
+  padding: 3px 10px; border-radius: var(--r-sm);
+  border: none; background: transparent;
+  color: var(--text-3); cursor: pointer; transition: all var(--t);
+}
+.ftab:hover { color: var(--text-2); }
+.ftab.on    { color: var(--text-1); background: var(--surface-2); border: 1px solid var(--border); }
+.ftab.pp-on { color: #a78bfa; background: rgba(124,58,237,0.12); border: 1px solid rgba(124,58,237,0.35); }
+.ftab.ud-on { color: #fbbf24; background: rgba(217,119,6,0.10);  border: 1px solid rgba(217,119,6,0.35); }
+.ftab#fPP:not(.pp-on):hover { color: #a78bfa; }
+.ftab#fUD:not(.ud-on):hover { color: #fbbf24; }
+
+/* Column headers */
+.col-headers {
+  display: grid;
+  grid-template-columns: 22px 1fr 140px 110px 80px 80px;
+  padding: 5px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; gap: 8px;
+  align-items: center;
+}
+.ch {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--text-4);
+}
+.ch.r { text-align: right; }
+
+.edge-list { overflow-y: auto; flex: 1; padding: 0; }
+.edge-list::-webkit-scrollbar { width: 3px; }
+.edge-list::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+
+/* ── Edge row ── */
+.edge-row {
+  display: grid;
+  grid-template-columns: 22px 1fr 140px 110px 80px 80px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  transition: background var(--t);
+  gap: 8px;
+  align-items: center;
+  user-select: none;
+  position: relative;
+}
+.edge-row::before {
+  content: ''; position: absolute;
+  left: 0; top: 0; bottom: 0; width: 2px;
+  background: var(--accent);
+  transform: scaleY(0); transform-origin: center;
+  transition: transform 120ms ease;
+  pointer-events: none;
+}
+.edge-row:hover { background: var(--surface-2); }
+.edge-row:hover::before { transform: scaleY(1); }
+.edge-row:last-child { border-bottom: none; }
+.edge-row.pp::before { background: #a78bfa; }
+.edge-row.ud::before { background: #fbbf24; }
+.edge-row.pp { background: rgba(124,58,237,0.04); }
+.edge-row.ud { background: rgba(217,119,6,0.04); }
+.edge-row.pp:hover { background: rgba(124,58,237,0.09); }
+.edge-row.ud:hover { background: rgba(217,119,6,0.08); }
+
+/* Selected — inset left accent bar via box-shadow to avoid layout shift */
+.edge-row.selected        { background: var(--accent-dim); box-shadow: inset 2px 0 0 var(--accent); }
+.edge-row.pp.selected     { background: rgba(124,58,237,0.12); box-shadow: inset 2px 0 0 #a78bfa; }
+.edge-row.ud.selected     { background: rgba(217,119,6,0.11); box-shadow: inset 2px 0 0 #fbbf24; }
+.edge-row.dimmed {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+/* Expand detail row */
+.edge-detail {
+  display: none;
+  grid-column: 1 / -1;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  margin: 7px -14px -7px;
+  padding: 8px 14px 8px 36px;
+  gap: 6px; flex-wrap: wrap;
+}
+.edge-row.expanded .edge-detail { display: flex; }
+
+/* View Lines button */
+.view-lines-btn {
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--text-4);
+  border-radius: 4px;
+  padding: 3px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.view-lines-btn:hover { color: var(--text-1); border-color: var(--text-2); background: var(--surface-3); }
+.edge-row.expanded .view-lines-btn { color: var(--accent); border-color: var(--accent); background: rgba(34,211,238,0.1); }
+
+/* Checkbox col */
+.c-check {
+  width: 16px; height: 16px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-2);
+  background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all var(--t);
+}
+.edge-row.selected .c-check { background: var(--accent); border-color: var(--accent); }
+.check-mark { display: none; }
+.edge-row.selected .check-mark { display: block; }
+
+/* Player column */
+.c-player { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.c-player-name { font-size: 13px; font-weight: 500; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.c-player-tags { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.ptag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  padding: 1px 4px; border-radius: var(--r-sm);
+  border: 1px solid var(--border-2); color: var(--text-3);
+}
+.ptag.pp, .ptag-sm.pp { color: #a78bfa; border-color: var(--pp-border); }
+.ptag.ud, .ptag-sm.ud { color: #fbbf24; border-color: var(--ud-border); }
+.stag    { font-size: 10px; font-weight: 400; color: var(--text-4); }
+.inj-tag { font-size: 9px; font-weight: 600; padding: 1px 4px; border-radius: var(--r-sm); background: var(--amber-dim, rgba(245,158,11,0.10)); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+
+/* Pick column */
+.c-pick { font-size: 12px; font-weight: 500; color: var(--text-2); line-height: 1.4; }
+.pick-over  { color: var(--accent); font-weight: 600; }
+.pick-under { color: var(--text-2); font-weight: 500; }
+
+/* Prob column — focal point, no bar */
+.c-prob { display: flex; flex-direction: column; }
+.prob-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 24px; font-weight: 700;
+  letter-spacing: -0.5px; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Edge column */
+.c-edge { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; text-align: right; }
+.c-edge.pos { color: var(--green); }
+.c-edge.dim { color: var(--text-4); }
+
+/* Books column */
+.c-books { display: flex; align-items: center; justify-content: flex-end; }
+.c-books-text { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-4); text-align: right; }
+
+/* Book detail items */
+.detail-book {
+  display: flex; flex-direction: column;
+  gap: 2px; padding: 6px 10px;
+  background: var(--bg); border-radius: var(--r);
+  border: 1px solid var(--border); min-width: 72px;
+}
+.db-name { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-4); font-family: 'JetBrains Mono', monospace; }
+.db-line { font-size: 12px; font-weight: 500; color: var(--text-1); font-family: 'JetBrains Mono', monospace; }
+.db-odds { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--text-3); }
+.detail-ref {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; background: var(--bg);
+  border-radius: var(--r); border: 1px solid var(--border);
+  font-size: 12px; margin-left: auto;
+}
+.detail-ref-label { color: var(--text-4); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; font-family: 'JetBrains Mono', monospace; }
+.detail-ref-val.yes { color: var(--green); font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.detail-ref-val.no  { color: var(--red);   font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+/* ── Side panel ── */
+.side-panel {
+  width: 300px; flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 10px;
+  overflow: hidden;
+}
+
+/* ── Builder card ── */
+.builder-card {
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      transparent 0px, transparent 22px,
+      rgba(255,255,255,0.007) 22px, rgba(255,255,255,0.007) 24px
+    ),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  transition: border-color 200ms ease;
+}
+.builder-card.has-legs { border-color: var(--accent-border); }
+.builder-card.has-legs.pp { border-color: var(--pp-border); box-shadow: 0 0 0 1px rgba(124,58,237,0.18), 0 0 22px var(--pp-glow); }
+.builder-card.has-legs.ud { border-color: var(--ud-border); box-shadow: 0 0 0 1px rgba(217,119,6,0.16), 0 0 22px var(--ud-glow); }
+
+.builder-header {
+  padding: 8px 12px;
+  height: 36px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.builder-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-4); }
+.builder-clear {
+  font-size: 11px; font-weight: 500; color: var(--text-4);
+  background: none; border: none; cursor: pointer;
+  padding: 2px 6px; border-radius: var(--r-sm); transition: color var(--t);
+}
+.builder-clear:hover { color: var(--red); }
+
+.builder-body { padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
+
+/* Leg items in builder */
+.leg-item {
+  display: flex; align-items: center;
+  gap: 8px; padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+.leg-item:last-of-type { border-bottom: none; }
+.leg-num {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--surface-2); color: var(--text-4);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; border: 1px solid var(--border);
+}
+.leg-info { flex: 1; min-width: 0; }
+.leg-player { font-size: 12px; font-weight: 500; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.leg-detail { font-size: 10px; color: var(--text-3); margin-top: 1px; font-family: 'JetBrains Mono', monospace; }
+.leg-prob { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+.leg-remove {
+  background: none; border: none; cursor: pointer;
+  font-size: 11px; color: var(--text-4);
+  padding: 2px 4px; border-radius: var(--r-sm);
+  transition: color var(--t); line-height: 1;
+}
+.leg-remove:hover { color: var(--red); }
+
+/* Empty builder placeholder */
+.leg-empty {
+  padding: 16px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; text-align: center;
+}
+.leg-empty-text { font-size: 12px; color: var(--text-4); font-weight: 400; }
+.leg-empty-sub  { font-size: 11px; color: var(--text-4); }
+
+/* EV display */
+.ev-display {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.ev-row   { display: flex; justify-content: space-between; align-items: center; }
+.ev-label { font-size: 10px; font-weight: 600; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; }
+.ev-val   { font-size: 12px; font-weight: 600; color: var(--text-2); font-family: 'JetBrains Mono', monospace; }
+.ev-val.big { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+.ev-val.pos { color: var(--green); }
+.ev-val.neg { color: var(--red); }
+.ev-divider { height: 1px; background: var(--border); }
+
+/* Platform lock notice */
+.platform-lock {
+  display: none;
+  align-items: center; gap: 6px;
+  padding: 6px 10px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r);
+  font-size: 11px; font-weight: 500; color: var(--text-3);
+}
+.platform-lock.show { display: flex; }
+
+/* Track button */
+.track-btn {
+  width: 100%; padding: 9px;
+  background: var(--accent); color: white;
+  border: none; border-radius: var(--r);
+  font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: background var(--t);
+  display: none;
+}
+.track-btn:hover { background: #4f5bbf; }
+.track-btn.show { display: block; }
+.track-btn:disabled { background: var(--border-2); cursor: not-allowed; color: var(--text-4); }
+
+/* Success flash */
+.track-success {
+  display: none; align-items: center; justify-content: center;
+  gap: 6px; padding: 9px;
+  background: var(--green-dim); border: 1px solid var(--green-border);
+  border-radius: var(--r);
+  font-size: 12px; font-weight: 600; color: var(--green);
+}
+.track-success.show { display: flex; }
+
+/* ── Slips card ── */
+.slips-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  display: flex; flex-direction: column;
+  overflow: hidden; flex: 1; min-height: 0;
+}
+.slips-header {
+  padding: 0 12px;
+  height: 36px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.slips-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-4); }
+.slips-tabs { display: flex; align-items: center; height: 100%; gap: 0; }
+.stab {
+  font-size: 11px; font-weight: 500;
+  padding: 0; margin-left: 12px;
+  height: 100%; border: none; background: none;
+  color: var(--text-3); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color var(--t), border-color var(--t);
+}
+.stab:first-child { margin-left: 0; }
+.stab.on { color: var(--text-1); border-bottom-color: var(--accent); }
+
+.slips-body { overflow-y: auto; flex: 1; padding: 6px 10px; }
+.slips-body::-webkit-scrollbar { width: 3px; }
+.slips-body::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+
+/* Slip items in Your Slips */
+.slip-item {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--r);
+  margin-bottom: 4px;
+  transition: background var(--t), border-color var(--t);
+}
+.slip-item:hover { background: var(--surface-2); }
+.slip-item:last-child { margin-bottom: 0; border-bottom: 1px solid var(--border); }
+.slip-item.pp { border: 1px solid var(--pp-border); box-shadow: 0 0 0 1px rgba(124,58,237,0.18), 0 0 22px var(--pp-glow); }
+.slip-item.pp:hover { border-color: rgba(124,58,237,0.55); }
+.slip-item.ud { border: 1px solid var(--ud-border); box-shadow: 0 0 0 1px rgba(217,119,6,0.16), 0 0 22px var(--ud-glow); }
+.slip-item.ud:hover { border-color: rgba(217,119,6,0.52); }
+.si-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.si-left { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.ptag-sm {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  padding: 1px 4px; border-radius: var(--r-sm);
+  border: 1px solid var(--border-2); color: var(--text-3);
+}
+.si-type { font-size: 10px; font-weight: 500; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.04em; }
+.si-jp   { font-size: 10px; color: var(--text-4); font-family: 'JetBrains Mono', monospace; }
+.si-ev-pct    { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; }
+.si-ev-dollar { font-size: 10px; color: var(--text-4); margin-top: 2px; text-align: right; font-family: 'JetBrains Mono', monospace; }
+.ev-p { color: var(--green); }
+.ev-n { color: var(--red); }
+.si-legs { border-top: 1px solid var(--border); padding-top: 5px; display: flex; flex-direction: column; gap: 3px; }
+.si-leg  { display: flex; justify-content: space-between; font-size: 10px; align-items: center; gap: 6px; }
+.leg-n   { color: var(--text-3); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.leg-p   { color: var(--text-4); font-family: 'JetBrains Mono', monospace; font-size: 10px; flex-shrink: 0; }
+
+.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; gap: 5px; text-align: center; }
+.e-title { font-size: 12px; font-weight: 500; color: var(--text-4); }
+.e-sub   { font-size: 11px; color: var(--text-4); }
+
+.loading { display: flex; align-items: center; justify-content: center; padding: 50px; gap: 8px; color: var(--text-4); font-size: 12px; }
+.spin { width: 14px; height: 14px; border: 2px solid var(--border-2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(60px);
+  background: var(--surface-2); color: var(--text-1);
+  padding: 8px 16px; border-radius: var(--r);
+  border: 1px solid var(--border-2);
+  font-size: 12px; font-weight: 500;
+  z-index: 999; transition: transform 0.25s ease;
+  white-space: nowrap;
+}
+.toast.show  { transform: translateX(-50%) translateY(0); }
+.toast.error { border-color: var(--red-border); color: var(--red); }
+
+/* ── Splash screen ── */
+#splash {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #08080a;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 32px;
+  transition: opacity 500ms ease;
+}
+#splash.out { opacity: 0; pointer-events: none; }
+
+/* Radar */
+.splash-radar {
+  position: relative;
+  width: 200px; height: 200px;
+  display: flex; align-items: center; justify-content: center;
+}
+/* Concentric rings */
+.splash-radar::before, .splash-radar::after {
+  content: ''; position: absolute;
+  border-radius: 50%; border: 1px solid rgba(34,211,238,0.10);
+  animation: radarAppear 400ms ease both;
+}
+.splash-radar::before { width: 200px; height: 200px; }
+.splash-radar::after  { width: 130px; height: 130px; animation-delay: 60ms; }
+.radar-ring-sm {
+  position: absolute; width: 68px; height: 68px;
+  border-radius: 50%; border: 1px solid rgba(34,211,238,0.10);
+  animation: radarAppear 400ms 120ms ease both;
+}
+@keyframes radarAppear {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+/* Crosshair lines */
+.radar-cross {
+  position: absolute; inset: 0;
+  animation: radarAppear 400ms 80ms ease both;
+}
+.radar-cross::before, .radar-cross::after {
+  content: ''; position: absolute;
+  background: rgba(34,211,238,0.08);
+}
+.radar-cross::before { left: 50%; top: 0; bottom: 0; width: 1px; transform: translateX(-50%); }
+.radar-cross::after  { top: 50%; left: 0; right: 0; height: 1px; transform: translateY(-50%); }
+/* Sweep */
+.radar-sweep {
+  position: absolute; width: 100px; height: 100px;
+  top: 50%; left: 50%; margin: -50px 0 0 -50px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 75%, rgba(34,211,238,0.22) 90%, rgba(34,211,238,0.05) 100%);
+  animation: radarSpin 1.4s linear 300ms 2 both;
+  transform-origin: center;
+}
+@keyframes radarSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+/* Center mark */
+.splash-center-mark {
+  position: relative; z-index: 2;
+  width: 64px; height: 64px;
+  background: #111113;
+  border: 1.5px solid rgba(34,211,238,0.30);
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  animation: markPop 500ms 500ms cubic-bezier(0.16,1,0.3,1) both;
+  box-shadow: 0 0 24px rgba(34,211,238,0.12), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.splash-center-mark svg { width: 34px; height: 34px; }
+@keyframes markPop {
+  from { opacity: 0; transform: scale(0.7); }
+  to   { opacity: 1; transform: scale(1); }
+}
+/* Ping dot — appears as sweep passes */
+.radar-ping {
+  position: absolute;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: #22d3ee;
+  box-shadow: 0 0 6px 2px rgba(34,211,238,0.6);
+  animation: pingAppear 300ms 1800ms ease both;
+}
+.radar-ping-1 { top: 22%; left: 68%; }
+.radar-ping-2 { top: 58%; left: 20%; }
+.radar-ping-3 { top: 75%; left: 62%; }
+@keyframes pingAppear {
+  from { opacity: 0; transform: scale(0); }
+  to   { opacity: 1; transform: scale(1); }
+}
+/* Wordmark */
+.splash-word {
+  font-size: 20px; font-weight: 700; letter-spacing: -0.02em;
+  animation: splashText 400ms 700ms cubic-bezier(0.16,1,0.3,1) both;
+}
+@keyframes splashText {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* Tagline */
+.splash-tag {
+  font-size: 10px; font-weight: 500; letter-spacing: 0.12em;
+  text-transform: uppercase; color: #3f3f46;
+  animation: splashText 400ms 850ms cubic-bezier(0.16,1,0.3,1) both;
+  margin-top: -24px;
+}
+</style>
+</head>
+<body>
+
+<!-- Splash screen -->
+<div id="splash">
+  <div class="splash-radar">
+    <div class="radar-ring-sm"></div>
+    <div class="radar-cross"></div>
+    <div class="radar-sweep"></div>
+    <div class="splash-center-mark">
+      <svg viewBox="0 0 20 20" fill="none">
+        <path d="M17.5 9.5L3 4.5v4l5 1.5-5 1.5v4l14.5-5c.33-.11.33-.89 0-1z" fill="#22d3ee"/>
+      </svg>
+    </div>
+    <div class="radar-ping radar-ping-1"></div>
+    <div class="radar-ping radar-ping-2"></div>
+    <div class="radar-ping radar-ping-3"></div>
+  </div>
+  <div class="splash-word"><span style="color:#e4e4e7">Prop</span><span style="color:#22d3ee">ilot</span></div>
+  <div class="splash-tag">NBA Prop Edge Finder</div>
+</div>
+<script>(function(){var s=document.getElementById('splash');if(!s)return;if(sessionStorage.getItem('splashShown')){s.remove();return;}sessionStorage.setItem('splashShown','1');setTimeout(function(){s.classList.add('out');setTimeout(function(){s.remove();},500);},2200);})();</script>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 20 20" fill="none">
+        <path d="M17.5 9.5L3 4.5v4l5 1.5-5 1.5v4l14.5-5c.33-.11.33-.89 0-1z" fill="#22d3ee"/>
+      </svg>
+    </div>
+    <div class="logo-text"><span class="lt-w">Prop</span><span class="lt-c">ilot</span></div>
+  </div>
+  <div class="nav-links">
+    <a href="/" class="nav-link active">Your Bets</a>
+    <a href="/autopilot" class="nav-link inactive">Autopilot</a>
+  </div>
+  <div class="topbar-right">
+    <div class="live-badge"><div class="live-dot"></div>Live</div>
+    <div class="refresh-badge" id="refreshBadge">Updated —</div>
+    <div class="topbar-ts" id="ts">--:-- --</div>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- ── Edge feed ── -->
+  <div class="feed-panel">
+    <div class="feed-toolbar">
+      <div class="feed-title-group">
+        <div class="feed-title">Edge Feed</div>
+        <span class="feed-count" id="edgeCount">0 edges</span>
+        <span class="feed-hint">Click to select · 2 or 3 picks</span>
+        <span class="downtime-notice" id="downtimeNotice" style="display:none">&#9790; Data dormant 2–10 AM</span>
+      </div>
+      <div class="filter-tabs">
+        <button class="ftab on" id="fAll" onclick="setFilter('all')">All</button>
+        <button class="ftab"    id="fPP"  onclick="setFilter('PP')">PrizePicks</button>
+        <button class="ftab"    id="fUD"  onclick="setFilter('UD')">Underdog</button>
+      </div>
+    </div>
+    <div class="col-headers">
+      <div class="ch"></div>
+      <div class="ch">Player</div>
+      <div class="ch">Pick</div>
+      <div class="ch">Prob</div>
+      <div class="ch r">Edge</div>
+      <div class="ch r">Books</div>
+    </div>
+    <div class="edge-list" id="edgeList">
+      <div class="loading"><div class="spin"></div> Loading edges...</div>
+    </div>
+  </div>
+
+  <!-- ── Side panel ── -->
+  <div class="side-panel">
+
+    <!-- Builder -->
+    <div class="builder-card" id="builderCard">
+      <div class="builder-header">
+        <div class="builder-title">Slip Builder</div>
+        <button class="builder-clear" onclick="clearAll()">Clear</button>
+      </div>
+      <div class="builder-body">
+        <div id="legSlots"></div>
+
+        <!-- Platform lock notice -->
+        <div class="platform-lock" id="platformLock"></div>
+
+        <!-- EV panel (shown when 2+ legs) -->
+        <div class="ev-display" id="evDisplay" style="display:none">
+          <div class="ev-row">
+            <span class="ev-label">Win Probability</span>
+            <span class="ev-val" id="evJointProb">—</span>
+          </div>
+          <div class="ev-row">
+            <span class="ev-label">Multiplier</span>
+            <span class="ev-val" id="evMultiplier">—</span>
+          </div>
+          <div class="ev-row">
+            <span class="ev-label">Stake</span>
+            <span class="ev-val" id="evStake">$5.00</span>
+          </div>
+          <div class="ev-divider"></div>
+          <div class="ev-row">
+            <span class="ev-label">Expected Value</span>
+            <span class="ev-val big" id="evValue">—</span>
+          </div>
+          <div class="ev-row">
+            <span class="ev-label">EV %</span>
+            <span class="ev-val" id="evPct">—</span>
+          </div>
+        </div>
+
+        <div class="track-success" id="trackSuccess">✓ Slip tracked!</div>
+        <button class="track-btn" id="trackBtn" onclick="trackSlip()">Track This Slip</button>
+      </div>
+    </div>
+
+    <!-- Your Slips -->
+    <div class="slips-card">
+      <div class="slips-header">
+        <div class="slips-title">Your Slips</div>
+        <div class="slips-tabs">
+          <button class="stab on" id="stActive"  onclick="setSlipTab('active')">Active</button>
+          <button class="stab"    id="stResults" onclick="setSlipTab('results')">Results</button>
+        </div>
+      </div>
+      <div class="slips-body" id="slipsBody">
+        <div class="empty"><div class="e-title">No slips yet</div><div class="e-sub">Select 2 or 3 edges to build one</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let allEdges   = [];
+let filter     = 'all';
+let selected   = [];
+let slipTab    = 'active';
+let yourSlips  = { active: [], settled: [] };
+let lastUpdate = null;
+
+const STAT_LABELS = {
+  points: 'PTS', rebounds: 'REB', assists: 'AST', threes: '3PM',
+  pra: 'P+R+A', pr: 'P+R', pa: 'P+A', ra: 'R+A'
+};
+
+const PP_MULT = { '2-pick': 3.0, '3-pick': 6.0 };
+const UD_MULT = { '2-pick': 3.5, '3-pick': 6.5 };
+const STAKE   = 5.0;
+
+// ── Prob class helper ──────────────────────────────────────────────────────
+function probClass(p) {
+  return p >= 62 ? 'prob-high' : p >= 57 ? 'prob-mid' : p >= 52 ? 'prob-norm' : 'prob-dim';
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => el.className = 'toast', 2500);
+}
+
+function setFilter(f) {
+  filter = f;
+  document.getElementById('fAll').className = 'ftab' + (f === 'all' ? ' on' : '');
+  document.getElementById('fPP').className  = 'ftab' + (f === 'PP'  ? ' pp-on' : '');
+  document.getElementById('fUD').className  = 'ftab' + (f === 'UD'  ? ' ud-on' : '');
+  renderEdges();
+}
+
+function setSlipTab(tab) {
+  slipTab = tab;
+  document.getElementById('stActive').className  = 'stab' + (tab === 'active'  ? ' on' : '');
+  document.getElementById('stResults').className = 'stab' + (tab === 'results' ? ' on' : '');
+  renderSlips();
+}
+
+function lockedPlatform() {
+  return selected.length > 0 ? selected[0].platform : null;
+}
+
+function calcEV() {
+  if (selected.length < 2) return null;
+  const platform  = selected[0].platform;
+  const slipType  = selected.length === 2 ? '2-pick' : '3-pick';
+  const mult      = platform === 'PP' ? PP_MULT[slipType] : UD_MULT[slipType];
+  const jointProb = selected.reduce((acc, e) => acc * (e.prob / 100), 1);
+  const payout    = jointProb * STAKE * mult;
+  const ev        = payout - STAKE;
+  const evPct     = (ev / STAKE) * 100;
+  return { jointProb, mult, ev, evPct, platform, slipType };
+}
+
+// ── Selection logic ────────────────────────────────────────────────────────
+function toggleSelect(edge) {
+  const locked = lockedPlatform();
+  if (locked && edge.platform !== locked) return;
+
+  const idx = selected.findIndex(e => e.player === edge.player && e.stat === edge.stat && e.direction === edge.direction && e.platform === edge.platform);
+  if (idx >= 0) {
+    selected.splice(idx, 1);
+  } else {
+    if (selected.length >= 3) {
+      toast('Max 3 picks per slip', true);
+      return;
+    }
+    selected.push(edge);
+  }
+
+  renderEdges();
+  renderBuilder();
+}
+
+function removeleg(idx) {
+  selected.splice(idx, 1);
+  renderEdges();
+  renderBuilder();
+}
+
+function clearAll() {
+  selected = [];
+  renderEdges();
+  renderBuilder();
+  document.getElementById('trackSuccess').className = 'track-success';
+}
+
+// ── Render edges ───────────────────────────────────────────────────────────
+function renderEdges() {
+  const locked  = lockedPlatform();
+  const edges   = filter === 'all' ? allEdges : allEdges.filter(e => e.platform === filter);
+  const sorted  = [...edges].sort((a, b) => b.prob - a.prob);
+  const el      = document.getElementById('edgeList');
+
+  if (!sorted.length) {
+    el.innerHTML = '<div class="empty"><div class="e-title">No edges right now</div><div class="e-sub">Check back closer to tip-off</div></div>';
+    return;
+  }
+
+  el.innerHTML = sorted.map(e => {
+    const isSelected = selected.some(s => s.player === e.player && s.stat === e.stat && s.direction === e.direction && s.platform === e.platform);
+    const isDimmed   = locked && e.platform !== locked && !isSelected;
+
+    const statLabel = STAT_LABELS[e.stat] || e.stat.toUpperCase();
+    const dirWord   = e.direction === 'OVER' ? 'Over' : 'Under';
+    const dirClass  = e.direction === 'OVER' ? 'pick-over' : 'pick-under';
+    const pClass    = probClass(e.prob);
+    const edge      = e.prob - 52.38;
+    const edgeStr   = edge >= 0 ? `+${edge.toFixed(1)}%` : `${edge.toFixed(1)}%`;
+    const edgeClass = edge >= 2 ? 'c-edge pos' : 'c-edge dim';
+
+    const books = [];
+    if (e.pin !== '-') books.push('PIN');
+    if (e.fd  !== '-') books.push('FD');
+    if (e.dk  !== '-') books.push('DK');
+    if (e.mgm !== '-') books.push('MGM');
+
+    let refHtml = '<span style="color:var(--text-4)">—</span>';
+    if (e.ref_line != null) {
+      const rl = e.platform === 'PP' ? 'UD' : 'PP';
+      refHtml = e.ref_agrees
+        ? `<span style="color:var(--green);font-weight:600;font-family:monospace">${rl} ${e.ref_line} ✓</span>`
+        : `<span style="color:var(--red);font-weight:600;font-family:monospace">${rl} ${e.ref_line} ✗</span>`;
+    }
+
+    const injHtml  = e.injury_status ? `<span class="inj-tag">${e.injury_status.toUpperCase()}</span>` : '';
+    const starHtml = e.star_risk ? `<span class="inj-tag">${e.star_risk.split(' ')[1] || e.star_risk}</span>` : '';
+
+    const bookMap = {'Pinnacle':e.pin,'FanDuel':e.fd,'DraftKings':e.dk,'BetMGM':e.mgm};
+    const bookDetails = Object.entries(bookMap)
+      .filter(([,v]) => v && v !== '-')
+      .map(([name, val]) => {
+        const parts = val.split('/');
+        return `<div class="detail-book"><div class="db-name">${name}</div><div class="db-line">${parts[0]}</div><div class="db-odds">${parts[1]||''}</div></div>`;
+      }).join('');
+    const refDetail = (e.ref_line != null)
+      ? `<div class="detail-ref"><span class="detail-ref-label">${e.platform==='PP'?'UD':'PP'} line</span><span class="detail-ref-val ${e.ref_agrees?'yes':'no'}">${e.ref_line} ${e.ref_agrees?'✓':'✗'}</span></div>`
+      : '';
+
+    const classes = ['edge-row', e.platform.toLowerCase(), isSelected ? 'selected' : '', isDimmed ? 'dimmed' : ''].filter(Boolean).join(' ');
+
+    return `<div class="${classes}" onclick="handleCardClick(event, ${JSON.stringify(e).replace(/"/g, '&quot;')})">
+      <div class="c-check">
+        <svg class="check-mark" width="9" height="7" viewBox="0 0 9 7" fill="none">
+          <path d="M1 3.5L3 5.5L8 1" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="c-player">
+        <div class="c-player-name">${e.player}</div>
+        <div class="c-player-tags">
+          <span class="ptag ${e.platform.toLowerCase()}">${e.platform}</span>
+          <span class="stag">${statLabel}${e.team ? ` · ${e.team}` : ''}</span>
+          ${injHtml}${starHtml}
+        </div>
+      </div>
+      <div><div class="c-pick"><span class="${dirClass}">${dirWord}</span> ${e.platform_line} ${statLabel}</div></div>
+      <div class="c-prob">
+        <span class="prob-num ${pClass}">${e.prob}%</span>
+      </div>
+      <div class="${edgeClass}">${edgeStr}</div>
+      <div class="c-books"><button class="view-lines-btn" onclick="event.stopPropagation(); this.closest('.edge-row').classList.toggle('expanded')">View Lines</button></div>
+      <div class="edge-detail">${bookDetails}${refDetail}</div>
+    </div>`;
+  }).join('');
+}
+
+function handleCardClick(event, edge) {
+  const card    = event.currentTarget;
+  const check   = card.querySelector('.c-check');
+  const clicked = event.target;
+
+  const inCheckbox = check && (check === clicked || check.contains(clicked));
+
+  if (inCheckbox || clicked.closest('.c-player') || clicked.closest('.c-pick') ||
+      clicked.closest('.c-prob') || clicked.closest('.c-edge')) {
+    toggleSelect(edge);
+  }
+}
+
+// ── Render builder ─────────────────────────────────────────────────────────
+function renderBuilder() {
+  const locked  = lockedPlatform();
+  const card    = document.getElementById('builderCard');
+  const slots   = document.getElementById('legSlots');
+  const lockEl  = document.getElementById('platformLock');
+  const evEl    = document.getElementById('evDisplay');
+  const trackBtn = document.getElementById('trackBtn');
+
+  const platClass = locked ? locked.toLowerCase() : '';
+  card.className = ['builder-card', selected.length > 0 ? 'has-legs' : '', platClass].filter(Boolean).join(' ');
+
+  if (selected.length === 0) {
+    slots.innerHTML = `<div class="leg-empty">
+      <div class="leg-empty-text">No picks selected</div>
+      <div class="leg-empty-sub">Click edges to add legs</div>
+    </div>`;
+    lockEl.className = 'platform-lock';
+    evEl.style.display = 'none';
+    trackBtn.className = 'track-btn';
+    return;
+  }
+
+  // Render leg items
+  slots.innerHTML = selected.map((e, i) => {
+    const statLabel = STAT_LABELS[e.stat] || e.stat.toUpperCase();
+    const dirWord   = e.direction === 'OVER' ? 'Over' : 'Under';
+    const pClass    = probClass(e.prob);
+    return `<div class="leg-item">
+      <div class="leg-num">${i + 1}</div>
+      <div class="leg-info">
+        <div class="leg-player">${e.player}</div>
+        <div class="leg-detail">${dirWord} ${e.platform_line} ${statLabel}</div>
+      </div>
+      <div class="leg-prob ${pClass}">${e.prob}%</div>
+      <button class="leg-remove" onclick="removeleg(${i})">✕</button>
+    </div>`;
+  }).join('');
+
+  // Platform lock notice
+  if (locked) {
+    const name = locked === 'PP' ? 'PrizePicks' : 'Underdog';
+    lockEl.className = 'platform-lock show';
+    lockEl.innerHTML = `🔒 ${name} slip`;
+  } else {
+    lockEl.className = 'platform-lock';
+  }
+
+  // EV display
+  if (selected.length >= 2) {
+    const ev = calcEV();
+    evEl.style.display = 'flex';
+    evEl.style.flexDirection = 'column';
+    evEl.style.gap = '7px';
+
+    const jointPct = (ev.jointProb * 100).toFixed(1);
+    const evSign   = ev.ev >= 0 ? '+' : '';
+    const evClass  = ev.ev >= 0 ? 'ev-val big pos' : 'ev-val big neg';
+    const pctClass = ev.evPct >= 0 ? 'ev-val pos' : 'ev-val neg';
+
+    document.getElementById('evJointProb').textContent  = `${jointPct}%`;
+    document.getElementById('evMultiplier').textContent = `${ev.mult}x`;
+    document.getElementById('evStake').textContent      = `$${STAKE.toFixed(2)}`;
+    document.getElementById('evValue').className        = evClass;
+    document.getElementById('evValue').textContent      = `${evSign}$${ev.ev.toFixed(2)}`;
+    document.getElementById('evPct').className          = pctClass;
+    document.getElementById('evPct').textContent        = `${evSign}${ev.evPct.toFixed(1)}%`;
+
+    trackBtn.className = 'track-btn show';
+    trackBtn.textContent = selected.length === 2 ? 'Track 2-Pick Slip' : 'Track 3-Pick Slip';
+  } else {
+    evEl.style.display = 'none';
+    trackBtn.className = 'track-btn';
+  }
+}
+
+// ── Track slip ─────────────────────────────────────────────────────────────
+async function trackSlip() {
+  if (selected.length < 2) return;
+  const btn = document.getElementById('trackBtn');
+  btn.disabled = true;
+  btn.textContent = 'Tracking...';
+
+  try {
+    const platform = selected[0].platform;
+    const ev       = calcEV();
+
+    const slip = {
+      platform,
+      type:          ev.slipType,
+      status:        'active',
+      stake:         STAKE,
+      bet_ids:       [],
+      players:       selected.map(e => e.player),
+      teams:         selected.map(e => e.team || null),
+      details:       selected.map(e => `${e.direction} ${e.platform_line} ${(STAT_LABELS[e.stat] || e.stat).toUpperCase()}`),
+      added_probs:   selected.map(e => e.prob),
+      current_probs: selected.map(e => e.prob),
+      joint_prob:    parseFloat((ev.jointProb * 100).toFixed(2)),
+      ev:            parseFloat(ev.ev.toFixed(2)),
+      ev_pct:        parseFloat(ev.evPct.toFixed(1)),
+      result:        null,
+      payout:        null,
+      profit:        null,
+      settled_at:    null,
+    };
+
+    const res = await fetch('/api/your-slips', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(slip),
+    });
+
+    if (res.ok) {
+      document.getElementById('trackSuccess').className = 'track-success show';
+      btn.className = 'track-btn';
+      setTimeout(() => {
+        document.getElementById('trackSuccess').className = 'track-success';
+        clearAll();
+      }, 2000);
+      fetchYourSlips();
+    } else {
+      toast('Failed to track slip', true);
+      btn.disabled = false;
+      btn.textContent = 'Track This Slip';
+    }
+  } catch {
+    toast('Connection error', true);
+    btn.disabled = false;
+    btn.textContent = 'Track This Slip';
+  }
+}
+
+// ── Render slips ───────────────────────────────────────────────────────────
+function renderSlips() {
+  const el   = document.getElementById('slipsBody');
+  const list = slipTab === 'active' ? yourSlips.active : yourSlips.settled;
+
+  if (!list.length) {
+    const msg = slipTab === 'active' ? 'No active slips' : 'No results yet';
+    const sub = slipTab === 'active' ? 'Build one above' : 'Active slips settle automatically';
+    el.innerHTML = `<div class="empty"><div class="e-title">${msg}</div><div class="e-sub">${sub}</div></div>`;
+    return;
+  }
+
+  el.innerHTML = list.map(s => {
+    const evPct    = s.ev_pct != null ? `${s.ev_pct > 0 ? '+' : ''}${parseFloat(s.ev_pct).toFixed(1)}%` : '—';
+    const evDollar = s.ev != null
+      ? (s.ev >= 0 ? `+$${parseFloat(s.ev).toFixed(2)}` : `-$${Math.abs(parseFloat(s.ev)).toFixed(2)}`)
+      : '—';
+    const evClass = (s.ev_pct != null && s.ev_pct >= 0) ? 'ev-p' : 'ev-n';
+
+    const legs = s.players.map((p, i) => {
+      const prob = s.current_probs[i];
+      const lr   = s.leg_results ? s.leg_results[i] : null;
+      const nameColor = lr === 'hit'  ? 'color:var(--green);font-weight:600'
+                      : lr === 'miss' ? 'color:var(--red)'
+                      : 'color:var(--text-3)';
+      const sym = lr === 'hit' ? ' ✓' : lr === 'miss' ? ' ✗' : lr === 'void' ? ' ∅' : '';
+      return `<div class="si-leg">
+        <span class="leg-n" style="${nameColor}">${p} — ${s.details[i]}${sym}</span>
+        <span class="leg-p">${prob}%</span>
+      </div>`;
+    }).join('');
+
+    let resultBadge = '';
+    if (s.result) {
+      const rColor = s.result.startsWith('hit') ? 'var(--green)' : s.result === 'miss' ? 'var(--red)' : 'var(--text-4)';
+      const profit = s.profit != null ? ` · ${s.profit >= 0 ? '+' : ''}$${s.profit.toFixed(2)}` : '';
+      resultBadge = `<span style="font-size:11px;font-weight:600;color:${rColor}">${s.result.toUpperCase()}${profit}</span>`;
+    }
+
+    const platCls = s.platform === 'PP' ? 'pp' : 'ud';
+    return `<div class="slip-item ${platCls}">
+      <div class="si-head">
+        <div class="si-left">
+          <span class="ptag-sm ${platCls}">${s.platform}</span>
+          <span class="si-type">${s.type}</span>
+          <span class="si-jp">JP ${s.joint_prob}%</span>
+          ${resultBadge}
+        </div>
+        <div style="text-align:right">
+          <div class="si-ev-pct ${evClass}">${evPct} EV</div>
+          <div class="si-ev-dollar">$${s.stake} · ${evDollar}</div>
+        </div>
+      </div>
+      <div class="si-legs">${legs}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Fetch ──────────────────────────────────────────────────────────────────
+async function fetchEdges() {
+  try {
+    allEdges = await (await fetch('/api/edges')).json();
+    const pp = allEdges.filter(e => e.platform === 'PP').length;
+    const ud = allEdges.filter(e => e.platform === 'UD').length;
+    document.getElementById('edgeCount').textContent =
+      `${allEdges.length} edge${allEdges.length !== 1 ? 's' : ''} · ${pp} PP · ${ud} UD`;
+    renderEdges();
+  } catch {
+    document.getElementById('edgeList').innerHTML = '<div class="empty"><div class="e-title">Connection error</div></div>';
+  }
+}
+
+async function fetchYourSlips() {
+  try {
+    const d = await (await fetch('/api/your-slips')).json();
+    yourSlips = { active: d.active || [], settled: d.settled || [] };
+    renderSlips();
+  } catch {}
+}
+
+async function fetchLastUpdate() {
+  try {
+    const text = await (await fetch('/api/last_update')).text();
+    const el   = document.getElementById('refreshBadge');
+    if (text && text !== '—') {
+      lastUpdate = new Date(text);
+      if (isNaN(lastUpdate.getTime())) {
+        el.textContent = `Updated ${text}`;
+        el.className   = 'refresh-badge';
+      } else {
+        const mins = Math.floor((Date.now() - lastUpdate) / 60000);
+        el.textContent = mins < 1 ? 'Updated just now' : `Updated ${mins}m ago`;
+        el.className   = mins > 30 ? 'refresh-badge stale' : 'refresh-badge';
+      }
+    }
+  } catch {}
+}
+
+function updateTs() {
+  document.getElementById('ts').textContent =
+    new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', hour12:true});
+}
+
+async function refresh() {
+  await Promise.all([fetchEdges(), fetchYourSlips(), fetchLastUpdate()]);
+  updateTs();
+}
+
+setInterval(() => {
+  if (lastUpdate) {
+    const mins = Math.floor((Date.now() - lastUpdate) / 60000);
+    const el   = document.getElementById('refreshBadge');
+    el.textContent = mins < 1 ? 'Updated just now' : `Updated ${mins}m ago`;
+    el.className   = mins > 30 ? 'refresh-badge stale' : 'refresh-badge';
+  }
+  updateTs();
+}, 60000);
+
+refresh();
+setInterval(refresh, 600000);
+
+// Show dormant notice during 2–10 AM
+(function() {
+  const h = new Date().getHours();
+  if (h >= 2 && h < 10) {
+    document.getElementById('downtimeNotice').style.display = 'inline';
+  }
+})();
+
+document.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('click', e => {
+    if (link.href === window.location.href) return;
+    e.preventDefault();
+    Object.assign(document.body.style, { transition: 'opacity 150ms, transform 150ms', opacity: '0', transform: 'translateY(-4px)' });
+    setTimeout(() => { window.location.href = link.href; }, 160);
+  });
+});
+</script>
+</body>
+</html>

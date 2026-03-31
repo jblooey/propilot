@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Propilot — Autopilot</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:            #0f0f11;
+  --surface:       #141416;
+  --surface-2:     #18181b;
+  --border:        #222226;
+  --border-2:      #2e2e33;
+  --text-1:        #e4e4e7;
+  --text-2:        #a1a1aa;
+  --text-3:        #71717a;
+  --text-4:        #3f3f46;
+  --accent:        #22d3ee;
+  --accent-dim:    rgba(34,211,238,0.10);
+  --accent-border: rgba(34,211,238,0.28);
+  --green:         #22c55e;
+  --green-dim:     rgba(34,197,94,0.10);
+  --green-border:  rgba(34,197,94,0.25);
+  --red:           #ef4444;
+  --red-dim:       rgba(239,68,68,0.10);
+  --red-border:    rgba(239,68,68,0.25);
+  --amber:         #f59e0b;
+  --pp:            #7c3aed;
+  --pp-border:     rgba(124,58,237,0.38);
+  --pp-glow:       rgba(124,58,237,0.13);
+  --ud:            #d97706;
+  --ud-border:     rgba(217,119,6,0.38);
+  --ud-glow:       rgba(217,119,6,0.12);
+  --r:             6px;
+  --r-sm:          4px;
+  --t:             150ms ease;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--border-2) transparent; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+
+@keyframes pageIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fly { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+
+body {
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  font-size: 13px;
+  animation: pageIn 220ms ease both;
+}
+
+/* ── Topbar ── */
+.topbar {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  height: 40px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+  position: sticky; top: 0; z-index: 200;
+}
+.logo { display: flex; align-items: center; gap: 8px; }
+.logo-mark {
+  width: 28px; height: 28px; background: #18181b;
+  border: 1px solid #2e2e33;
+  border-radius: 7px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.logo-mark svg { width: 16px; height: 16px; }
+.logo-text { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.logo-text .lt-w { color: var(--text-1); }
+.logo-text .lt-c { color: var(--accent); }
+.plane-icon { color: var(--green); animation: fly 2.5s ease-in-out infinite; flex-shrink: 0; display: block; }
+.nav-links { display: flex; align-items: center; gap: 16px; }
+.nav-link {
+  font-size: 12px; font-weight: 500; color: var(--text-3);
+  text-decoration: none; padding-bottom: 2px;
+  border-bottom: 1px solid transparent;
+  transition: color var(--t), border-color var(--t);
+  line-height: 40px;
+}
+.nav-link.active   { color: var(--text-1); border-bottom-color: var(--accent); }
+.nav-link.inactive:hover { color: var(--text-2); }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.live-badge {
+  display: flex; align-items: center; gap: 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--green); background: var(--green-dim);
+  border: 1px solid var(--green-border);
+  padding: 2px 6px; border-radius: var(--r-sm);
+}
+.live-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--green); animation: blink 1.8s ease infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.topbar-ts { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-4); }
+
+/* ── Unit size bar ── */
+.unit-bar {
+  border-bottom: 1px solid var(--border);
+  padding: 7px 20px;
+  display: flex; align-items: center; gap: 14px;
+}
+.unit-label { font-size: 10px; font-weight: 600; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; }
+.unit-inputs { display: flex; align-items: center; gap: 4px; }
+.unit-btn {
+  width: 26px; height: 26px;
+  border: 1px solid var(--border); background: transparent;
+  font-size: 14px; color: var(--text-3);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-sm); transition: border-color var(--t), color var(--t);
+}
+.unit-btn:hover { border-color: var(--accent); color: var(--text-1); }
+.unit-input {
+  width: 56px; height: 26px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); text-align: center;
+  font-size: 12px; font-weight: 600; color: var(--text-1);
+  font-family: 'JetBrains Mono', monospace;
+  outline: none; transition: border-color var(--t);
+  -webkit-appearance: none; -moz-appearance: textfield;
+}
+.unit-input:focus { border-color: var(--accent); }
+.unit-divider { width: 1px; height: 14px; background: var(--border); }
+.unit-stat { display: flex; align-items: center; gap: 5px; }
+.us-label { font-size: 10px; font-weight: 500; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; }
+.us-val { font-size: 12px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: var(--text-2); }
+.us-val.pos { color: var(--green); }
+.us-val.neg { color: var(--red); }
+.us-val.neu { color: var(--text-3); }
+
+/* ── Stats row ── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  padding: 10px 20px 0;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 2px solid rgba(34,211,238,0.20);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(34,211,238,0.05) 0%, transparent 65%);
+  pointer-events: none;
+}
+.sc-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-4); margin-bottom: 6px; }
+.sc-value { font-size: 28px; font-weight: 700; color: var(--text-1); letter-spacing: -0.04em; line-height: 1; }
+.sc-value.g      { color: var(--green); }
+.sc-value.r      { color: var(--red); }
+.sc-value.a      { color: var(--amber); }
+.sc-value.accent { color: var(--accent); }
+.sc-sub { font-size: 10px; color: var(--text-4); margin-top: 5px; }
+.sc-sub.breakeven { font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+
+/* ── Prob classes ── */
+.prob-high { color: var(--text-1); }
+.prob-mid  { color: var(--text-1); }
+.prob-norm { color: var(--text-2); }
+.prob-dim  { color: var(--text-4); }
+
+/* ── Main layout ── */
+.main-layout {
+  display: flex;
+  padding: 10px 20px 16px;
+  gap: 12px;
+  height: calc(100vh - 40px - 41px - 86px);
+}
+
+/* ── Slips panel ── */
+.slips-panel {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.panel-toolbar {
+  padding: 0 14px;
+  height: 38px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.panel-title { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.07em; display: flex; align-items: center; gap: 8px; }
+.panel-title::after { content: ''; display: block; height: 1px; width: 28px; background: repeating-linear-gradient(90deg, var(--text-4) 0, var(--text-4) 3px, transparent 3px, transparent 7px); }
+.panel-tabs { display: flex; align-items: center; gap: 0; height: 100%; }
+.ptab {
+  font-size: 12px; font-weight: 500;
+  padding: 0; margin-right: 14px;
+  height: 100%; border: none; background: none;
+  color: var(--text-3); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color var(--t), border-color var(--t);
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.tab-icon { stroke: currentColor; flex-shrink: 0; }
+.ptab.tab-active      { color: var(--text-1); border-bottom-color: var(--accent); }
+.ptab.tab-live-active { color: var(--green);  border-bottom-color: var(--green); }
+.live-pulse { display: inline-flex; align-items: center; gap: 4px; }
+.live-pulse-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--green); animation: blink 1.8s ease infinite; }
+.tab-count {
+  font-size: 9px; font-weight: 600; font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); color: var(--text-3);
+  padding: 1px 5px; border-radius: 8px; line-height: 1.6;
+  min-width: 16px; text-align: center;
+}
+.panel-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; color: var(--text-4);
+}
+
+.slips-list { overflow-y: auto; flex: 1; padding: 8px 10px; }
+.slips-list::-webkit-scrollbar { width: 3px; }
+.slips-list::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+
+/* ── Slip card ── */
+.slip-card {
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  margin-bottom: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color var(--t);
+}
+.slip-card:hover { border-color: var(--border-2); }
+.slip-card:last-child { margin-bottom: 0; }
+
+.slip-card.pp {
+  border-color: var(--pp-border);
+  box-shadow: 0 0 0 1px rgba(124,58,237,0.18), 0 0 22px var(--pp-glow);
+}
+.slip-card.pp:hover { border-color: rgba(124,58,237,0.55); box-shadow: 0 0 0 1px rgba(124,58,237,0.25), 0 0 22px var(--pp-glow); }
+
+.slip-card.ud {
+  border-color: var(--ud-border);
+  box-shadow: 0 0 0 1px rgba(217,119,6,0.16), 0 0 22px var(--ud-glow);
+}
+.slip-card.ud:hover { border-color: rgba(217,119,6,0.52); box-shadow: 0 0 0 1px rgba(217,119,6,0.22), 0 0 22px var(--ud-glow); }
+.slip-detail {
+  display: none;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  flex-direction: column;
+  gap: 5px;
+}
+.slip-card.expanded .slip-detail { display: flex; }
+.slip-detail-row { display: flex; justify-content: space-between; font-size: 11px; }
+.sd-label { color: var(--text-4); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
+.sd-val   { color: var(--text-2); font-weight: 500; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+.slip-card.live { border-left: 2px solid var(--green); }
+.slip-card.hit  { border-left: 2px solid var(--green); }
+.slip-card.miss { border-left: 2px solid var(--red); }
+
+.slip-card-header {
+  padding: 8px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+}
+.sch-left { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ptag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  padding: 1px 5px; border-radius: var(--r-sm);
+  border: 1px solid var(--border-2); color: var(--text-3);
+}
+.ptag.pp { color: #a78bfa; border-color: var(--pp-border); }
+.ptag.ud { color: #fbbf24; border-color: var(--ud-border); }
+.type-badge {
+  font-size: 10px; font-weight: 500; color: var(--text-4);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.live-badge-sm {
+  display: flex; align-items: center; gap: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; color: var(--green);
+  background: var(--green-dim); border: 1px solid var(--green-border);
+  padding: 1px 5px; border-radius: var(--r-sm);
+}
+.jp-text    { font-size: 10px; color: var(--text-4); font-family: 'JetBrains Mono', monospace; }
+.stake-text { font-size: 10px; color: var(--text-4); }
+
+.sch-right { text-align: right; flex-shrink: 0; }
+.ev-pct-val { font-size: 14px; font-weight: 600; font-family: 'JetBrains Mono', monospace; line-height: 1; }
+.ev-pct-val.pos { color: var(--green); }
+.ev-pct-val.neg { color: var(--red); }
+.ev-pct-val.neu { color: var(--text-3); }
+.ev-dollar { font-size: 10px; color: var(--text-4); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+
+.slip-legs {
+  border-top: 1px solid var(--border);
+  padding: 6px 12px;
+  display: flex; flex-direction: column;
+  background: var(--surface-2);
+}
+.slip-leg {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+.slip-leg:last-child { border-bottom: none; }
+.leg-left { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; }
+.leg-num-sm {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--surface-2); color: var(--text-4);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+.leg-num-sm.hit  { background: var(--green-dim); color: var(--green); border-color: var(--green-border); }
+.leg-num-sm.miss { background: var(--red-dim);   color: var(--red);   border-color: var(--red-border); }
+.leg-num-sm.void { background: rgba(113,113,122,0.15); color: #71717a; border-color: rgba(113,113,122,0.30); }
+.leg-name { font-size: 12px; font-weight: 400; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.leg-name.hit  { color: var(--green); font-weight: 600; }
+.leg-name.miss { color: var(--red); text-decoration: line-through; opacity: 0.7; }
+.leg-name.void { color: #71717a; }
+.leg-detail-txt { font-size: 10px; color: var(--text-4); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+.leg-prob-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.leg-prob-val { font-size: 16px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.leg-delta { font-size: 9px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.leg-delta.up { color: var(--green); }
+.leg-delta.dn { color: var(--red); }
+.leg-delta.fl { color: var(--text-4); }
+
+.slip-footer {
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sf-result { font-size: 12px; font-weight: 600; }
+.sf-result.hit    { color: var(--green); }
+.sf-result.miss   { color: var(--red); }
+.sf-result.refund { color: var(--text-4); }
+.sf-settled { font-size: 10px; color: var(--text-4); font-family: 'JetBrains Mono', monospace; }
+
+/* ── Stats sidebar ── */
+.stats-sidebar {
+  width: 240px; flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 8px;
+  overflow-y: auto;
+}
+.stats-sidebar::-webkit-scrollbar { width: 3px; }
+.stats-sidebar::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+
+.sidebar-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.sidebar-card-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-card-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-4); }
+.sidebar-card-body  { padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
+
+.stat-row-item { display: flex; justify-content: space-between; align-items: center; }
+.sri-label { font-size: 12px; color: var(--text-3); font-weight: 400; }
+.sri-val   { font-size: 12px; font-weight: 600; color: var(--text-1); font-family: 'JetBrains Mono', monospace; }
+.sri-val.g { color: var(--green); }
+.sri-val.r { color: var(--red); }
+.sri-val.a { color: var(--amber); }
+
+.divider { height: 1px; background: var(--border); margin: 1px 0; }
+
+.breakeven-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 2px 0;
+}
+.be-label { font-size: 11px; font-weight: 400; color: var(--text-3); }
+.be-val   { font-size: 11px; font-weight: 600; color: var(--text-2); font-family: 'JetBrains Mono', monospace; }
+
+.platform-row { display: flex; align-items: center; gap: 8px; }
+.plat-icon {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+  color: var(--text-3); border: 1px solid var(--border-2);
+  padding: 1px 5px; border-radius: var(--r-sm);
+}
+.plat-bar-wrap { flex: 1; height: 3px; background: var(--border-2); border-radius: 1px; overflow: hidden; }
+.plat-bar  { height: 100%; border-radius: 1px; transition: width 0.4s ease; }
+.plat-val  { font-size: 11px; font-weight: 600; color: var(--text-2); font-family: 'JetBrains Mono', monospace; min-width: 24px; text-align: right; }
+
+.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; gap: 5px; text-align: center; }
+.e-title { font-size: 12px; font-weight: 500; color: var(--text-4); }
+.e-sub   { font-size: 11px; color: var(--text-4); }
+
+.loading { display: flex; align-items: center; justify-content: center; padding: 60px; gap: 8px; color: var(--text-4); font-size: 12px; }
+.spin { width: 14px; height: 14px; border: 2px solid var(--border-2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Splash screen ── */
+#splash {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #0a0a0c;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 400ms ease;
+}
+#splash.out { opacity: 0; pointer-events: none; }
+.splash-inner { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.splash-radar {
+  position: relative;
+  width: 200px; height: 200px;
+  display: flex; align-items: center; justify-content: center;
+}
+.splash-radar::before, .splash-radar::after {
+  content: ''; position: absolute;
+  border-radius: 50%; border: 1px solid rgba(34,211,238,0.10);
+  animation: radarAppear 400ms ease both;
+}
+.splash-radar::before { width: 200px; height: 200px; }
+.splash-radar::after  { width: 130px; height: 130px; animation-delay: 60ms; }
+.radar-ring-sm {
+  position: absolute; width: 68px; height: 68px;
+  border-radius: 50%; border: 1px solid rgba(34,211,238,0.10);
+  animation: radarAppear 400ms 120ms ease both;
+}
+@keyframes radarAppear {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.radar-cross { position: absolute; inset: 0; animation: radarAppear 400ms 80ms ease both; }
+.radar-cross::before, .radar-cross::after {
+  content: ''; position: absolute; background: rgba(34,211,238,0.08);
+}
+.radar-cross::before { left: 50%; top: 0; bottom: 0; width: 1px; transform: translateX(-50%); }
+.radar-cross::after  { top: 50%; left: 0; right: 0; height: 1px; transform: translateY(-50%); }
+.radar-sweep {
+  position: absolute; width: 100px; height: 100px;
+  top: 50%; left: 50%; margin: -50px 0 0 -50px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 75%, rgba(34,211,238,0.22) 90%, rgba(34,211,238,0.05) 100%);
+  animation: radarSpin 1.4s linear 300ms 2 both;
+}
+@keyframes radarSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.splash-center-mark {
+  position: relative; z-index: 2;
+  width: 64px; height: 64px; background: #111113;
+  border: 1.5px solid rgba(34,211,238,0.30); border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  animation: markPop 500ms 500ms cubic-bezier(0.16,1,0.3,1) both;
+  box-shadow: 0 0 24px rgba(34,211,238,0.12), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.splash-center-mark svg { width: 34px; height: 34px; }
+@keyframes markPop {
+  from { opacity: 0; transform: scale(0.7); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.radar-ping { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #22d3ee; box-shadow: 0 0 6px 2px rgba(34,211,238,0.6); animation: pingAppear 300ms 1800ms ease both; }
+.radar-ping-1 { top: 22%; left: 68%; }
+.radar-ping-2 { top: 58%; left: 20%; }
+.radar-ping-3 { top: 75%; left: 62%; }
+@keyframes pingAppear { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
+.splash-word {
+  font-size: 20px; font-weight: 700; letter-spacing: -0.02em;
+  animation: splashText 400ms 700ms cubic-bezier(0.16,1,0.3,1) both;
+}
+@keyframes splashText { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.splash-tag {
+  font-size: 10px; font-weight: 500; letter-spacing: 0.12em;
+  text-transform: uppercase; color: #3f3f46;
+  animation: splashText 400ms 850ms cubic-bezier(0.16,1,0.3,1) both;
+  margin-top: -24px;
+}
+</style>
+</head>
+<body>
+
+<!-- Splash screen -->
+<div id="splash">
+  <div class="splash-radar">
+    <div class="radar-ring-sm"></div>
+    <div class="radar-cross"></div>
+    <div class="radar-sweep"></div>
+    <div class="splash-center-mark">
+      <svg viewBox="0 0 20 20" fill="none">
+        <path d="M17.5 9.5L3 4.5v4l5 1.5-5 1.5v4l14.5-5c.33-.11.33-.89 0-1z" fill="#22d3ee"/>
+      </svg>
+    </div>
+    <div class="radar-ping radar-ping-1"></div>
+    <div class="radar-ping radar-ping-2"></div>
+    <div class="radar-ping radar-ping-3"></div>
+  </div>
+  <div class="splash-word"><span style="color:#e4e4e7">Prop</span><span style="color:#22d3ee">ilot</span></div>
+  <div class="splash-tag">NBA Prop Edge Finder</div>
+</div>
+<script>(function(){var s=document.getElementById('splash');if(!s)return;if(sessionStorage.getItem('splashShown')){s.remove();return;}sessionStorage.setItem('splashShown','1');setTimeout(function(){s.classList.add('out');setTimeout(function(){s.remove();},500);},2200);})();</script>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 20 20" fill="none">
+        <path d="M17.5 9.5L3 4.5v4l5 1.5-5 1.5v4l14.5-5c.33-.11.33-.89 0-1z" fill="#22d3ee"/>
+      </svg>
+    </div>
+    <div class="logo-text"><span class="lt-w">Prop</span><span class="lt-c">ilot</span></div>
+  </div>
+  <div class="nav-links">
+    <a href="/" class="nav-link inactive">Your Bets</a>
+    <a href="/autopilot" class="nav-link active">Autopilot</a>
+  </div>
+  <div class="topbar-right">
+    <div class="live-badge">
+      <svg class="plane-icon" width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M14.5 7.5c.28.28.28.72 0 1L3 13V10l5.5-2.5L3 5V2l11.5 5.5Z"/></svg>
+      Autopilot Active
+    </div>
+    <div class="topbar-ts" id="ts">--:-- --</div>
+  </div>
+</div>
+
+<!-- Unit size bar -->
+<div class="unit-bar">
+  <span class="unit-label">Unit</span>
+  <div class="unit-inputs">
+    <button class="unit-btn" onclick="adjustUnit(-1)">−</button>
+    <input class="unit-input" id="unitInput" type="number" min="1" max="1000" value="5" onchange="unitChanged()">
+    <button class="unit-btn" onclick="adjustUnit(1)">+</button>
+  </div>
+  <div class="unit-divider"></div>
+  <div class="unit-stat">
+    <span class="us-label">7-Day P&L</span>
+    <span class="us-val" id="unitPnl">—</span>
+  </div>
+  <div class="unit-divider"></div>
+  <div class="unit-stat">
+    <span class="us-label">In Units</span>
+    <span class="us-val" id="unitCount">—</span>
+  </div>
+  <div class="unit-divider"></div>
+  <div class="unit-stat">
+    <span class="us-label">Open EV</span>
+    <span class="us-val neu" id="openEv">—</span>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="sc-label">Leg Hit Rate</div>
+    <div class="sc-value" id="statIndHitRate">—</div>
+    <div class="sc-sub" id="statIndRecord">— of — legs</div>
+  </div>
+  <div class="stat-card">
+    <div class="sc-label">PP 2-Pick</div>
+    <div class="sc-value" id="statPP2">—</div>
+    <div class="sc-sub breakeven">need 33.3% BE</div>
+  </div>
+  <div class="stat-card">
+    <div class="sc-label">PP 3-Pick</div>
+    <div class="sc-value" id="statPP3">—</div>
+    <div class="sc-sub breakeven">need 16.7% BE</div>
+  </div>
+  <div class="stat-card">
+    <div class="sc-label">UD 2-Pick</div>
+    <div class="sc-value" id="statUD2">—</div>
+    <div class="sc-sub breakeven">need 28.6% BE</div>
+  </div>
+  <div class="stat-card">
+    <div class="sc-label">UD 3-Pick</div>
+    <div class="sc-value" id="statUD3">—</div>
+    <div class="sc-sub breakeven">need 15.4% BE</div>
+  </div>
+</div>
+
+<!-- Main layout -->
+<div class="main-layout">
+
+  <!-- Slips panel -->
+  <div class="slips-panel">
+    <div class="panel-toolbar">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="panel-title" id="panelTitle">Slips</div>
+        <span id="downtimeNotice" style="display:none;font-size:10px;color:#3f3f46;font-family:'JetBrains Mono',monospace;">&#9790; Dormant 2–10 AM</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;height:100%">
+        <span class="panel-count" id="panelCount">0</span>
+        <div class="panel-tabs">
+          <button class="ptab tab-live-active" id="tabLive" onclick="setTab('live')">
+            <span class="live-pulse"><span class="live-pulse-dot"></span>Live</span>
+            <span class="tab-count" id="countLive">0</span>
+          </button>
+          <button class="ptab" id="tabActive" onclick="setTab('active')">
+            <svg class="tab-icon" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"/><circle cx="6" cy="6" r="1.5" fill="currentColor" stroke="none"/><line x1="6" y1="1" x2="6" y2="2.2"/><line x1="6" y1="9.8" x2="6" y2="11"/><line x1="1" y1="6" x2="2.2" y2="6"/><line x1="9.8" y1="6" x2="11" y2="6"/></svg>
+            Active
+            <span class="tab-count" id="countActive">0</span>
+          </button>
+          <button class="ptab" id="tabResults" onclick="setTab('results')">
+            <svg class="tab-icon" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="1.5" y1="3" x2="7.5" y2="3"/><line x1="1.5" y1="6" x2="7.5" y2="6"/><line x1="1.5" y1="9" x2="5" y2="9"/><polyline points="8 7.5 9.2 8.8 11 6.5"/></svg>
+            Results
+            <span class="tab-count" id="countResults">0</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="slips-list" id="slipsList">
+      <div class="loading"><div class="spin"></div> Loading slips...</div>
+    </div>
+  </div>
+
+  <!-- Stats sidebar -->
+  <div class="stats-sidebar">
+
+    <div class="sidebar-card">
+      <div class="sidebar-card-header">
+        <div class="sidebar-card-title">Performance</div>
+      </div>
+      <div class="sidebar-card-body">
+        <div class="stat-row-item">
+          <span class="sri-label">Total slips</span>
+          <span class="sri-val" id="sbTotal">—</span>
+        </div>
+        <div class="stat-row-item">
+          <span class="sri-label">All-time hit rate</span>
+          <span class="sri-val" id="sbHitRate">—</span>
+        </div>
+        <div class="divider"></div>
+        <div class="stat-row-item">
+          <span class="sri-label">Hits</span>
+          <span class="sri-val g" id="sbHits">—</span>
+        </div>
+        <div class="stat-row-item">
+          <span class="sri-label">Misses</span>
+          <span class="sri-val r" id="sbMisses">—</span>
+        </div>
+        <div class="stat-row-item">
+          <span class="sri-label">Refunds</span>
+          <span class="sri-val" id="sbRefunds">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-card">
+      <div class="sidebar-card-header">
+        <div class="sidebar-card-title">Breakeven Rates</div>
+      </div>
+      <div class="sidebar-card-body">
+        <div class="breakeven-row">
+          <span class="be-label">PP 2-Pick · 3x</span>
+          <span class="be-val">33.3%</span>
+        </div>
+        <div class="breakeven-row">
+          <span class="be-label">PP 3-Pick · 6x</span>
+          <span class="be-val">16.7%</span>
+        </div>
+        <div class="breakeven-row">
+          <span class="be-label">UD 2-Pick · 3.5x</span>
+          <span class="be-val">28.6%</span>
+        </div>
+        <div class="breakeven-row">
+          <span class="be-label">UD 3-Pick · 6.5x</span>
+          <span class="be-val">15.4%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-card">
+      <div class="sidebar-card-header">
+        <div class="sidebar-card-title">Platform Split</div>
+      </div>
+      <div class="sidebar-card-body" id="platformSplit">
+        <div class="platform-row">
+          <span class="plat-icon">PP</span>
+          <div class="plat-bar-wrap"><div class="plat-bar" id="ppBar" style="width:0%;background:#a78bfa"></div></div>
+          <span class="plat-val" id="ppCount">0</span>
+        </div>
+        <div class="platform-row">
+          <span class="plat-icon">UD</span>
+          <div class="plat-bar-wrap"><div class="plat-bar" id="udBar" style="width:0%;background:#fbbf24"></div></div>
+          <span class="plat-val" id="udCount">0</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let currentTab = 'live';
+let slipsData  = { live: [], active: [], results: [] };
+let unitSize   = parseFloat(localStorage.getItem('propilot_unit') || '5');
+let stats      = {};
+
+document.getElementById('unitInput').value = unitSize;
+
+const STAT_LABELS = {
+  points: 'PTS', rebounds: 'REB', assists: 'AST', threes: '3PM',
+  pra: 'P+R+A', pr: 'P+R', pa: 'P+A', ra: 'R+A'
+};
+
+// ── Prob class helper ──────────────────────────────────────────────────────
+function probClass(p) {
+  return p >= 62 ? 'prob-high' : p >= 57 ? 'prob-mid' : p >= 52 ? 'prob-norm' : 'prob-dim';
+}
+
+// ── Unit size ──────────────────────────────────────────────────────────────
+function adjustUnit(delta) {
+  unitSize = Math.max(1, unitSize + delta);
+  document.getElementById('unitInput').value = unitSize;
+  localStorage.setItem('propilot_unit', unitSize);
+  updateUnitDisplay();
+  renderSlips();
+}
+
+function unitChanged() {
+  unitSize = Math.max(1, parseFloat(document.getElementById('unitInput').value) || 5);
+  localStorage.setItem('propilot_unit', unitSize);
+  updateUnitDisplay();
+  renderSlips();
+}
+
+function updateUnitDisplay() {
+  if (stats.weekly_profit == null) return;
+  const baseStake = 5;
+  const profit    = (stats.weekly_profit / baseStake) * unitSize;
+  const units     = profit / unitSize;
+  const pnlEl     = document.getElementById('unitPnl');
+  const unitEl    = document.getElementById('unitCount');
+  pnlEl.textContent = profit >= 0 ? `+$${profit.toFixed(2)}` : `-$${Math.abs(profit).toFixed(2)}`;
+  pnlEl.className   = `us-val ${profit > 0 ? 'pos' : profit < 0 ? 'neg' : 'neu'}`;
+  const unitStr = units >= 0 ? `+${units.toFixed(1)}u` : `${units.toFixed(1)}u`;
+  unitEl.textContent = unitStr;
+  unitEl.className   = `us-val ${units > 0 ? 'pos' : units < 0 ? 'neg' : 'neu'}`;
+}
+
+// ── Stake scaling ──────────────────────────────────────────────────────────
+function getStakeForSlip(s) {
+  return unitSize;
+}
+
+// ── Tab ────────────────────────────────────────────────────────────────────
+function setTab(tab) {
+  currentTab = tab;
+  document.getElementById('tabLive').className    = 'ptab' + (tab === 'live'    ? ' tab-live-active' : '');
+  document.getElementById('tabActive').className  = 'ptab' + (tab === 'active'  ? ' tab-active' : '');
+  document.getElementById('tabResults').className = 'ptab' + (tab === 'results' ? ' tab-active' : '');
+  renderSlips();
+}
+
+// ── Render slips ───────────────────────────────────────────────────────────
+function renderSlips() {
+  const el   = document.getElementById('slipsList');
+  const list = slipsData[currentTab] || [];
+
+  const titles = { live: 'Live Slips', active: 'Active Slips', results: 'Slip Results' };
+  document.getElementById('panelTitle').textContent = titles[currentTab];
+  document.getElementById('panelCount').textContent = list.length;
+
+  if (!list.length) {
+    const msgs = {
+      live:    ['No flights on the runway', 'Awaiting departure — slips appear after the next refresh'],
+      active:  ['No active slips', 'Live slips move here after the next refresh cycle'],
+      results: ['No results yet', 'Slips settle automatically after games end'],
+    };
+    const [title, sub] = msgs[currentTab];
+    el.innerHTML = `<div class="empty"><div class="e-title">${title}</div><div class="e-sub">${sub}</div></div>`;
+    return;
+  }
+
+  el.innerHTML = list.map(s => renderSlipCard(s)).join('');
+}
+
+function renderSlipCard(s) {
+  const isLive   = currentTab === 'live';
+  const stake    = getStakeForSlip(s);
+  const evPct    = s.ev_pct != null ? parseFloat(s.ev_pct) : 0;
+  const evClass  = evPct === 0 ? 'neu' : evPct > 0 ? 'pos' : 'neg';
+  const evStr    = `${evPct >= 0 ? '+' : ''}${evPct.toFixed(1)}%`;
+  const scaledEv = s.ev != null ? (parseFloat(s.ev) / (s.stake || 5)) * stake : null;
+  const evDollar = scaledEv != null
+    ? (scaledEv >= 0 ? `+$${scaledEv.toFixed(2)}` : `-$${Math.abs(scaledEv).toFixed(2)}`)
+    : '—';
+
+  const liveBadge = isLive
+    ? `<span class="live-badge-sm"><span class="live-pulse-dot"></span>Live</span>`
+    : '';
+
+  const legs = s.players.map((p, i) => {
+    const prob    = s.current_probs ? s.current_probs[i] : s.added_probs[i];
+    const added   = s.added_probs[i];
+    const diff    = parseFloat((prob - added).toFixed(1));
+    const dc      = diff > 0 ? 'up' : diff < 0 ? 'dn' : 'fl';
+    const ds      = diff > 0 ? `\u2191${diff}%` : diff < 0 ? `\u2193${Math.abs(diff)}%` : '\u2192';
+    const lr      = s.leg_results ? s.leg_results[i] : null;
+    const lrClass = lr === 'hit' ? 'hit' : lr === 'miss' ? 'miss' : lr === 'void' ? 'void' : '';
+    console.log(s.players[i], lr, lrClass);
+    const sym     = lr === 'hit' ? ' \u2713' : lr === 'miss' ? ' \u2717' : lr === 'void' ? ' \u2205 void' : '';
+    return `<div class="slip-leg">
+      <div class="leg-left">
+        <div class="leg-num-sm ${lrClass}">${i + 1}</div>
+        <span class="leg-name ${lrClass}">${p}${sym}</span>
+        <span class="leg-detail-txt">${s.details[i]}</span>
+      </div>
+      <div class="leg-prob-right">
+        <span class="leg-prob-val ${probClass(prob)}">${prob}%</span>
+        <span class="leg-delta ${dc}">${ds}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  let footer = '';
+  if (s.result) {
+    const rMap = {
+      'hit':    { cls: 'hit',    label: '\u2713 Hit' },
+      'hit-2':  { cls: 'hit',    label: '\u2713 Hit (2/3)' },
+      'hit-3':  { cls: 'hit',    label: '\u2713 Hit (3-pick)' },
+      'miss':   { cls: 'miss',   label: '\u2717 Miss' },
+      'refund': { cls: 'refund', label: '\u2205 Refund' },
+    };
+    const r            = rMap[s.result] || { cls: 'miss', label: s.result };
+    const scaledProfit = s.profit != null ? (parseFloat(s.profit) / (s.stake || 5)) * stake : null;
+    const profitStr    = scaledProfit != null
+      ? ` \u00b7 ${scaledProfit >= 0 ? '+' : ''}$${scaledProfit.toFixed(2)}`
+      : '';
+    footer = `<div class="slip-footer">
+      <span class="sf-result ${r.cls}">${r.label}${profitStr}</span>
+      <span class="sf-settled">${s.settled_at || ''}</span>
+    </div>`;
+  }
+
+  const resultClass   = s.result ? (s.result.startsWith('hit') ? 'hit' : s.result === 'miss' ? 'miss' : '') : '';
+  const liveClass     = isLive ? 'live' : '';
+  const platformClass = s.platform === 'PP' ? 'pp' : 'ud';
+  const cardClasses   = ['slip-card', platformClass, liveClass, resultClass].filter(Boolean).join(' ');
+
+  return `<div class="${cardClasses}" onclick="this.classList.toggle('expanded')">
+    <div class="slip-card-header">
+      <div class="sch-left">
+        <span class="ptag ${platformClass}">${s.platform}</span>
+        <span class="type-badge">${s.type}</span>
+        ${liveBadge}
+        <span class="jp-text">JP ${s.joint_prob}%</span>
+        <span class="stake-text">$${stake.toFixed(2)}</span>
+      </div>
+      <div class="sch-right">
+        <div class="ev-pct-val ${evClass}">${evStr} EV</div>
+        <div class="ev-dollar">${evDollar}</div>
+      </div>
+    </div>
+    <div class="slip-legs">${legs}</div>
+    <div class="slip-detail">
+      <div class="slip-detail-row"><span class="sd-label">Created</span><span class="sd-val">${s.created_at || '—'}</span></div>
+      <div class="slip-detail-row"><span class="sd-label">Joint Prob</span><span class="sd-val">${s.joint_prob}%</span></div>
+      <div class="slip-detail-row"><span class="sd-label">Stake</span><span class="sd-val">$${stake.toFixed(2)}</span></div>
+      <div class="slip-detail-row"><span class="sd-label">EV</span><span class="sd-val">${evStr} · ${evDollar}</span></div>
+      ${s.added_probs.map((p, i) => `<div class="slip-detail-row"><span class="sd-label">${s.players[i].split(' ').pop()}</span><span class="sd-val">Added ${p}% → Now ${s.current_probs[i]}%</span></div>`).join('')}
+    </div>
+    ${footer}
+  </div>`;
+}
+
+// ── Fetch & update ─────────────────────────────────────────────────────────
+async function fetchSlips() {
+  try {
+    const d = await (await fetch('/api/autopilot-slips')).json();
+
+    slipsData = {
+      live:    d.live    || [],
+      active:  d.active  || [],
+      results: d.settled || [],
+    };
+    stats = d;
+
+    // Stats row
+    const settled = d.settled || [];
+
+    const indRate = d.individual_hit_rate || 0;
+    const indEl   = document.getElementById('statIndHitRate');
+    indEl.textContent = indRate > 0 ? `${indRate}%` : '—';
+    indEl.className   = `sc-value ${indRate >= 55 ? 'g' : indRate > 0 ? 'a' : ''}`;
+    document.getElementById('statIndRecord').textContent =
+      d.individual_total > 0 ? `${d.individual_hits} of ${d.individual_total} legs` : '— of — legs';
+
+    const pp2El = document.getElementById('statPP2');
+    const pp3El = document.getElementById('statPP3');
+    const ud2El = document.getElementById('statUD2');
+    const ud3El = document.getElementById('statUD3');
+    pp2El.textContent = d.pp_2_rate > 0 ? `${d.pp_2_rate}%` : '—';
+    pp2El.className   = `sc-value ${d.pp_2_rate >= 33.3 ? 'g' : d.pp_2_rate > 0 ? 'a' : ''}`;
+    pp3El.textContent = d.pp_3_rate > 0 ? `${d.pp_3_rate}%` : '—';
+    pp3El.className   = `sc-value ${d.pp_3_rate >= 16.7 ? 'g' : d.pp_3_rate > 0 ? 'a' : ''}`;
+    ud2El.textContent = d.ud_2_rate > 0 ? `${d.ud_2_rate}%` : '—';
+    ud2El.className   = `sc-value ${d.ud_2_rate >= 28.6 ? 'g' : d.ud_2_rate > 0 ? 'a' : ''}`;
+    ud3El.textContent = d.ud_3_rate > 0 ? `${d.ud_3_rate}%` : '—';
+    ud3El.className   = `sc-value ${d.ud_3_rate >= 15.4 ? 'g' : d.ud_3_rate > 0 ? 'a' : ''}`;
+
+    // Tab counts
+    document.getElementById('countLive').textContent   = slipsData.live.length;
+    document.getElementById('countActive').textContent = slipsData.active.length;
+    document.getElementById('countResults').textContent = slipsData.results.length;
+
+    const openEv = d.total_open_ev || 0;
+    const evEl   = document.getElementById('openEv');
+    evEl.textContent = openEv >= 0 ? `+$${openEv.toFixed(2)}` : `-$${Math.abs(openEv).toFixed(2)}`;
+    evEl.className   = `us-val ${openEv > 0 ? 'pos' : openEv < 0 ? 'neg' : 'neu'}`;
+
+    updateUnitDisplay();
+
+    document.getElementById('sbTotal').textContent   = d.total || 0;
+    const hits    = settled.filter(s => s.result && s.result.startsWith('hit')).length;
+    const misses  = settled.filter(s => s.result === 'miss').length;
+    const refunds = settled.filter(s => s.result === 'refund').length;
+    document.getElementById('sbTotal').textContent   = d.total || 0;
+    document.getElementById('sbHitRate').textContent = d.total > 0 ? `${d.hit_rate}%` : '—';
+    document.getElementById('sbHits').textContent    = hits;
+    document.getElementById('sbMisses').textContent  = misses;
+    document.getElementById('sbRefunds').textContent = refunds;
+
+    const allSlips = [...slipsData.live, ...slipsData.active, ...slipsData.results];
+    const ppCount  = allSlips.filter(s => s.platform === 'PP').length;
+    const udCount  = allSlips.filter(s => s.platform === 'UD').length;
+    const total    = ppCount + udCount || 1;
+    document.getElementById('ppCount').textContent = ppCount;
+    document.getElementById('udCount').textContent = udCount;
+    document.getElementById('ppBar').style.width   = `${(ppCount / total) * 100}%`;
+    document.getElementById('udBar').style.width   = `${(udCount / total) * 100}%`;
+
+    renderSlips();
+  } catch(err) {
+    console.error('fetchSlips error:', err);
+    document.getElementById('slipsList').innerHTML = '<div class="empty"><div class="e-title">Failed to load slips</div><div class="e-sub">Check console for details</div></div>';
+  }
+}
+
+function updateTs() {
+  document.getElementById('ts').textContent =
+    new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', hour12:true});
+}
+
+async function refresh() {
+  await fetchSlips();
+  updateTs();
+}
+
+refresh();
+setInterval(refresh, 60000);
+
+// Show dormant notice during 2–10 AM
+(function() {
+  const h = new Date().getHours();
+  if (h >= 2 && h < 10) {
+    document.getElementById('downtimeNotice').style.display = 'inline';
+  }
+})();
+
+document.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('click', e => {
+    if (link.href === window.location.href) return;
+    e.preventDefault();
+    Object.assign(document.body.style, { transition: 'opacity 150ms, transform 150ms', opacity: '0', transform: 'translateY(-4px)' });
+    setTimeout(() => { window.location.href = link.href; }, 160);
+  });
+});
+</script>
+</body>
+</html>

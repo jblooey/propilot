@@ -1,0 +1,14 @@
+.env
+*.pyc
+__pycache__/
+bets.json
+autopilot_slips.json
+your_slips.json
+edges_cache.json
+results.json
+last_update.txt
+.idea/
+.claude/
+.agents/
+templates/logo_preview.html
+templates/downtime.html
