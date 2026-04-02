@@ -395,7 +395,7 @@ print("\nCommands: a=add bet  p=parlay  s=settle  r=results  q=quit")
 # Run immediately on startup, then sync to SGO refresh cycle
 import oddsapi as _oddsapi
 
-DOWNTIME_START = 2   # 2 AM local
+DOWNTIME_START = 0   # midnight local
 DOWNTIME_END   = 10  # 10 AM local
 
 def sleep_until_morning():

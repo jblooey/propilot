@@ -647,7 +647,7 @@ body {
     <div class="panel-toolbar">
       <div style="display:flex;align-items:center;gap:8px;">
         <div class="panel-title" id="panelTitle">Slips</div>
-        <span id="downtimeNotice" style="display:none;font-size:10px;color:#3f3f46;font-family:'JetBrains Mono',monospace;">&#9790; Dormant 2–10 AM</span>
+        <span id="downtimeNotice" style="display:none;font-size:10px;color:#3f3f46;font-family:'JetBrains Mono',monospace;">&#9790; Dormant 12–10 AM</span>
       </div>
       <div style="display:flex;align-items:center;gap:10px;height:100%">
         <span class="panel-count" id="panelCount">0</span>
@@ -1137,7 +1137,7 @@ setInterval(refresh, 60000);
 // Show dormant notice during 2–10 AM
 (function() {
   const h = new Date().getHours();
-  if (h >= 2 && h < 10) {
+  if (h >= 0 && h < 10) {
     document.getElementById('downtimeNotice').style.display = 'inline';
   }
 })();
