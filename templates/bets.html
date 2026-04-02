@@ -971,7 +971,6 @@ function renderSlipCard(s) {
     const ds      = diff > 0 ? `\u2191${diff}%` : diff < 0 ? `\u2193${Math.abs(diff)}%` : '\u2192';
     const lr      = s.leg_results ? s.leg_results[i] : null;
     const lrClass = lr === 'hit' ? 'hit' : lr === 'miss' ? 'miss' : lr === 'void' ? 'void' : '';
-    console.log(s.players[i], lr, lrClass);
     const sym     = lr === 'hit' ? ' \u2713' : lr === 'miss' ? ' \u2717' : lr === 'void' ? ' \u2205 void' : '';
     return `<div class="slip-leg">
       <div class="leg-left">
