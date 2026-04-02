@@ -1,4 +1,6 @@
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, redirect, url_for, flash
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import check_password_hash
 from bet_tracker import load_bets
 from slip_tracker import load_slips, load_your_slips
 from datetime import datetime, timedelta
@@ -6,6 +8,40 @@ import json
 import os
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+
+login_manager = LoginManager(app)
+login_manager.login_view = "login_page"
+
+
+# ── User model ────────────────────────────────────────────────────────────────
+
+USERS_FILE = os.path.join(os.path.dirname(__file__), "users.json")
+
+
+def _load_users():
+    if not os.path.exists(USERS_FILE):
+        return []
+    with open(USERS_FILE) as f:
+        return json.load(f)
+
+
+class User(UserMixin):
+    def __init__(self, data):
+        self.id            = data["id"]
+        self.username      = data["username"]
+        self.password_hash = data["password_hash"]
+
+    def get_id(self):
+        return str(self.id)
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    for u in _load_users():
+        if str(u["id"]) == str(user_id):
+            return User(u)
+    return None
 
 
 STAT_NORMALIZE = {
@@ -103,9 +139,36 @@ def _enrich_slip(s, bet_lookup):
     return {**s, "leg_results": leg_results}
 
 
+# ── Auth routes ───────────────────────────────────────────────────────────────
+
+@app.route("/login", methods=["GET", "POST"])
+def login_page():
+    if current_user.is_authenticated:
+        return redirect(url_for("your_bets_page"))
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip().lower()
+        password = request.form.get("password", "")
+        remember = bool(request.form.get("remember"))
+        user_data = next((u for u in _load_users() if u["username"] == username), None)
+        if user_data and check_password_hash(user_data["password_hash"], password):
+            login_user(User(user_data), remember=remember)
+            return redirect(url_for("your_bets_page"))
+        error = "Invalid username or password."
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("login_page"))
+
+
 # ── Pages ─────────────────────────────────────────────────────────────────────
 
 @app.route("/")
+@login_required
 def your_bets_page():
     return render_template("index.html")
 
@@ -288,8 +351,10 @@ def api_autopilot_slips():
 # ── Your Bets slip APIs ───────────────────────────────────────────────────────
 
 @app.route("/api/your-slips")
+@login_required
 def api_your_slips():
-    slips      = load_your_slips()
+    uid        = current_user.id
+    slips      = [s for s in load_your_slips() if s.get("user_id") == uid]
     bets       = load_bets()
     bet_lookup = _build_bet_lookup(bets)
 
@@ -315,6 +380,7 @@ def api_your_slips():
 
 
 @app.route("/api/your-slips", methods=["POST"])
+@login_required
 def api_post_your_slip():
     from slip_tracker import load_your_slips, save_your_slips
     data       = request.get_json()
@@ -323,6 +389,7 @@ def api_post_your_slip():
     data["id"]         = max(all_ids) + 1 if all_ids else 1
     data["created_at"] = datetime.now().strftime("%Y-%m-%d %I:%M %p")
     data["key"]        = f"{data['platform']}:{data['created_at']}"
+    data["user_id"]    = current_user.id
 
     # Look up actual bet IDs at save time so update_your_slips can use direct lookup.
     # Build active-bets-first lookup: active bets take priority over settled ones.
