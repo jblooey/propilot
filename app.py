@@ -426,6 +426,58 @@ def api_post_your_slip():
     return jsonify({"ok": True, "id": data["id"]})
 
 
+@app.route("/api/your-slips/<int:slip_id>", methods=["PATCH"])
+@login_required
+def api_settle_your_slip(slip_id):
+    from slip_tracker import load_your_slips, save_your_slips
+    data       = request.get_json()
+    your_slips = load_your_slips()
+    slip       = next((s for s in your_slips
+                       if s["id"] == slip_id and s.get("user_id") == current_user.id), None)
+    if not slip:
+        return jsonify({"error": "Not found"}), 404
+
+    leg_results = data.get("leg_results")
+    if not leg_results or len(leg_results) != len(slip["players"]):
+        return jsonify({"error": "Invalid leg_results"}), 400
+
+    PAYOUTS = {("PP", 2): 3.0, ("PP", 3): 6.0, ("UD", 2): 3.5, ("UD", 3): 6.5}
+
+    platform = slip["platform"]
+    stake    = float(slip.get("stake", 5.0))
+    n_legs   = len(leg_results)
+    hits     = [r for r in leg_results if r == "hit"]
+    misses   = [r for r in leg_results if r == "miss"]
+    voids    = [r for r in leg_results if r == "void"]
+    n_active = n_legs - len(voids)
+
+    if misses:
+        result = "miss"
+        payout = 0.0
+    elif len(voids) == n_legs:
+        result = "refund"
+        payout = stake
+    elif n_active == len(hits):
+        if not voids:
+            result = "hit"
+        else:
+            result = "hit-2" if n_legs == 3 else "hit"
+        mult   = PAYOUTS.get((platform, n_active), 1.0)
+        payout = round(stake * mult, 2)
+    else:
+        result = "miss"
+        payout = 0.0
+
+    slip["leg_results"] = leg_results
+    slip["result"]      = result
+    slip["payout"]      = payout
+    slip["profit"]      = round(payout - stake, 2)
+    slip["settled_at"]  = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+
+    save_your_slips(your_slips)
+    return jsonify({"ok": True, "result": result, "payout": payout, "profit": slip["profit"]})
+
+
 # ── Legacy aliases ────────────────────────────────────────────────────────────
 
 @app.route("/api/slips")

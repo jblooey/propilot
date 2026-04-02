@@ -510,6 +510,73 @@ body {
 .e-sub   { font-size: 11px; color: var(--text-4); }
 
 .loading { display: flex; align-items: center; justify-content: center; padding: 50px; gap: 8px; color: var(--text-4); font-size: 12px; }
+
+/* ── Settle modal ── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);
+  align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border-2);
+  border-radius: 10px; padding: 20px; width: 340px; max-width: 95vw;
+}
+.modal-title {
+  font-size: 13px; font-weight: 600; color: var(--text-1);
+  margin-bottom: 14px;
+}
+.modal-leg {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 10px;
+}
+.modal-leg-name {
+  font-size: 11px; color: var(--text-2); flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.leg-btns { display: flex; gap: 4px; flex-shrink: 0; }
+.leg-btn {
+  font-size: 10px; font-weight: 600; padding: 3px 8px;
+  border-radius: var(--r-sm); border: 1px solid var(--border-2);
+  background: transparent; color: var(--text-3); cursor: pointer;
+  transition: all 150ms ease; font-family: 'JetBrains Mono', monospace;
+}
+.leg-btn:hover { color: var(--text-1); border-color: var(--border-2); }
+.leg-btn.hit.sel  { background: var(--green-dim);  border-color: var(--green-border);  color: var(--green); }
+.leg-btn.miss.sel { background: var(--red-dim);    border-color: var(--red-border);    color: var(--red); }
+.leg-btn.void.sel { background: rgba(113,113,122,0.12); border-color: rgba(113,113,122,0.3); color: #a1a1aa; }
+.modal-result {
+  margin: 14px 0 16px;
+  padding: 8px 10px;
+  border-radius: var(--r); background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 12px; color: var(--text-3);
+  font-family: 'JetBrains Mono', monospace;
+}
+.modal-result span { font-weight: 600; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.modal-cancel {
+  font-size: 12px; font-weight: 500; color: var(--text-3);
+  background: transparent; border: 1px solid var(--border-2);
+  border-radius: var(--r); padding: 6px 14px; cursor: pointer;
+  transition: color var(--t);
+}
+.modal-cancel:hover { color: var(--text-1); }
+.modal-confirm {
+  font-size: 12px; font-weight: 600; color: #0f0f11;
+  background: var(--accent); border: none;
+  border-radius: var(--r); padding: 6px 14px; cursor: pointer;
+  transition: opacity var(--t);
+}
+.modal-confirm:hover { opacity: 0.85; }
+.settle-btn {
+  font-size: 10px; font-weight: 500; color: var(--text-4);
+  background: transparent; border: 1px solid var(--border);
+  border-radius: var(--r-sm); padding: 2px 7px; cursor: pointer;
+  transition: color var(--t), border-color var(--t);
+  font-family: 'JetBrains Mono', monospace; margin-left: 6px;
+}
+.settle-btn:hover { color: var(--text-2); border-color: var(--border-2); }
 .spin { width: 14px; height: 14px; border: 2px solid var(--border-2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -1133,6 +1200,7 @@ function renderSlips() {
           <span class="si-type">${s.type}</span>
           <span class="si-jp">JP ${s.joint_prob}%</span>
           ${resultBadge}
+          <button class="settle-btn" onclick="event.stopPropagation();openSettle(${s.id})">⚙ Settle</button>
         </div>
         <div style="text-align:right">
           <div class="si-ev-pct ${evClass}">${evPct} EV</div>
@@ -1223,6 +1291,123 @@ document.querySelectorAll('.nav-link').forEach(link => {
     setTimeout(() => { window.location.href = link.href; }, 160);
   });
 });
+
+// ── Settle modal ──────────────────────────────────────────────────────────────
+let settleSlip = null;
+let settleLegResults = [];
+
+const PAYOUTS = { PP: {2: 3.0, 3: 6.0}, UD: {2: 3.5, 3: 6.5} };
+
+function openSettle(slipId) {
+  const all  = [...yourSlips.active, ...yourSlips.settled];
+  settleSlip = all.find(s => s.id === slipId);
+  if (!settleSlip) return;
+
+  settleLegResults = settleSlip.leg_results
+    ? [...settleSlip.leg_results]
+    : settleSlip.players.map(() => null);
+
+  const modal = document.getElementById('settleModal');
+  document.getElementById('modalTitle').textContent =
+    `Settle · ${settleSlip.platform} ${settleSlip.type}`;
+
+  const legsEl = document.getElementById('modalLegs');
+  legsEl.innerHTML = settleSlip.players.map((p, i) => `
+    <div class="modal-leg" id="mleg-${i}">
+      <span class="modal-leg-name">${p} — ${settleSlip.details[i]}</span>
+      <div class="leg-btns">
+        <button class="leg-btn hit  ${settleLegResults[i]==='hit'  ? 'sel':''}" onclick="setLeg(${i},'hit')">HIT</button>
+        <button class="leg-btn miss ${settleLegResults[i]==='miss' ? 'sel':''}" onclick="setLeg(${i},'miss')">MISS</button>
+        <button class="leg-btn void ${settleLegResults[i]==='void' ? 'sel':''}" onclick="setLeg(${i},'void')">VOID</button>
+      </div>
+    </div>`).join('');
+
+  updateModalResult();
+  modal.classList.add('open');
+}
+
+function setLeg(i, val) {
+  settleLegResults[i] = val;
+  ['hit','miss','void'].forEach(t => {
+    const btn = document.querySelector(`#mleg-${i} .leg-btn.${t}`);
+    if (btn) btn.classList.toggle('sel', t === val);
+  });
+  updateModalResult();
+}
+
+function calcSettleResult() {
+  if (settleLegResults.some(r => r === null)) return null;
+  const s        = settleSlip;
+  const stake    = parseFloat(s.stake || 5);
+  const platform = s.platform;
+  const n        = settleLegResults.length;
+  const hits     = settleLegResults.filter(r => r === 'hit').length;
+  const misses   = settleLegResults.filter(r => r === 'miss').length;
+  const voids    = settleLegResults.filter(r => r === 'void').length;
+  const active   = n - voids;
+
+  if (misses > 0)    return { result: 'miss',   payout: 0, profit: -stake };
+  if (voids === n)   return { result: 'refund',  payout: stake, profit: 0 };
+  if (hits === active) {
+    const result = voids > 0 ? 'hit-2' : 'hit';
+    const mult   = (PAYOUTS[platform] || {})[active] || 1;
+    const payout = Math.round(stake * mult * 100) / 100;
+    return { result, payout, profit: Math.round((payout - stake) * 100) / 100 };
+  }
+  return { result: 'miss', payout: 0, profit: -stake };
+}
+
+function updateModalResult() {
+  const el  = document.getElementById('modalResult');
+  const res = calcSettleResult();
+  if (!res) {
+    el.innerHTML = 'Select a result for each leg';
+    return;
+  }
+  const color  = res.result.startsWith('hit') ? 'var(--green)' : res.result === 'miss' ? 'var(--red)' : 'var(--text-3)';
+  const profit = res.profit >= 0 ? `+$${res.profit.toFixed(2)}` : `-$${Math.abs(res.profit).toFixed(2)}`;
+  el.innerHTML  = `Result: <span style="color:${color}">${res.result.toUpperCase()}</span> &nbsp;·&nbsp; Payout: <span>$${res.payout.toFixed(2)}</span> &nbsp;·&nbsp; P&L: <span style="color:${color}">${profit}</span>`;
+}
+
+function closeSettle() {
+  document.getElementById('settleModal').classList.remove('open');
+  settleSlip = null;
+}
+
+async function confirmSettle() {
+  const res = calcSettleResult();
+  if (!res) return;
+  try {
+    const r = await fetch(`/api/your-slips/${settleSlip.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leg_results: settleLegResults }),
+    });
+    const d = await r.json();
+    if (d.ok) { closeSettle(); fetchYourSlips(); }
+    else alert('Error: ' + (d.error || 'unknown'));
+  } catch(e) {
+    alert('Network error');
+  }
+}
+
+// Close modal on overlay click
+document.getElementById('settleModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSettle();
+});
 </script>
+
+<!-- Settle modal -->
+<div class="modal-overlay" id="settleModal">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle">Settle Slip</div>
+    <div id="modalLegs"></div>
+    <div class="modal-result" id="modalResult">Select a result for each leg</div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeSettle()">Cancel</button>
+      <button class="modal-confirm" onclick="confirmSettle()">Confirm</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
