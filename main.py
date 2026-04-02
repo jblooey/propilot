@@ -5,7 +5,7 @@ from pinnacle import get_pinnacle_props
 from oddsapi import get_oddsapi_props
 from injuries import check_player_injury, check_team_uncertainty, STAR_UNCERTAINTY_BUMP
 from scipy.stats import norm
-from datetime import datetime
+from datetime import datetime, timezone
 
 STAT_KEY_MAP = {
     "points":   "PTS",
@@ -263,8 +263,12 @@ def weighted_consensus(stat_data, platform_line, sigma):
     if other_books and "pinnacle" in stat_data:
         other_avg = sum(v["line"] for v in other_books.values()) / len(other_books)
         pin_line  = stat_data["pinnacle"]["line"]
-        if abs(pin_line - other_avg) > 1.5:
-            print(f"  [Consensus] Pinnacle line {pin_line} excluded (consensus {other_avg:.1f})")
+        # Relative threshold: exclude Pinnacle if it differs by >8% of the consensus line.
+        # A fixed 1.5pt threshold is too loose for large lines (PRA ~40) and too strict
+        # for small lines (3PM ~2). 8% relative scales correctly across all stat types.
+        rel_threshold = max(1.5, other_avg * 0.08)
+        if abs(pin_line - other_avg) > rel_threshold:
+            print(f"  [Consensus] Pinnacle line {pin_line} excluded (consensus {other_avg:.1f}, threshold {rel_threshold:.2f})")
             stat_data = {k: v for k, v in stat_data.items() if k != "pinnacle"}
 
     total_weight  = 0
@@ -336,7 +340,10 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
                player_team_map=None, injury_map=None):
     edges        = []
     ref_lookup   = build_ref_lookup(ref_props)
-    current_hour = datetime.now().hour
+    # Use DST-aware ET hour so thresholds fire at the right time regardless of server timezone
+    _now_utc     = datetime.now(timezone.utc)
+    _et_offset   = -4 if 3 <= _now_utc.month <= 11 else -5
+    current_hour = (_now_utc.hour + _et_offset) % 24
 
     for prop in platform_props:
         stat_key = prop.get("stat") or prop.get("stat_type")
@@ -355,12 +362,6 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
         if player_team_map:
             team = player_team_map.get(normalize_name(player))
 
-        # Fallback: use SGO roster-derived team from the anchor.
-        # This fills in team=null for recently traded players or anyone
-        # the ESPN roster map missed — eliminates same-team slip errors.
-        if not team and sb_entry:
-            team = sb_entry.get("anchor", {}).get("player_team", "") or None
-
         inj_status = None
         if injury_map:
             should_suppress, inj_status = check_player_injury(player, injury_map)
@@ -377,6 +378,10 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
 
         if not sb_entry:
             continue
+
+        # Fallback: use anchor-derived team if ESPN map missed this player
+        if not team:
+            team = sb_entry.get("anchor", {}).get("player_team", "") or None
 
         stat_data = sb_entry["props"].get(stat_key)
         if not stat_data:
@@ -414,7 +419,7 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
                         ref_line = rl
                         break
 
-        is_whole_number = (platform_line == int(platform_line))
+        is_whole_number = (platform_line % 1 == 0)
 
         if current_hour < 11:
             min_prob = MIN_PROB_PP_EARLY if platform_name == "PP" else MIN_PROB_UD_EARLY

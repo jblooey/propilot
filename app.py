@@ -24,7 +24,7 @@ def load_latest_edges():
             with open("edges_cache.json") as f:
                 content = f.read().strip()
                 return json.loads(content) if content else []
-    except:
+    except (OSError, ValueError):
         return []
     return []
 
@@ -173,26 +173,38 @@ def api_results():
 def api_last_update():
     try:
         return open("last_update.txt").read()
-    except:
+    except OSError:
         return "—"
 
 
 # ── Autopilot slip APIs ───────────────────────────────────────────────────────
 
+# Maps the last word of a slip detail (e.g. "OVER 22.0 PA") to a display label
+_DETAIL_STAT_LABELS = {
+    "POINTS": "Points", "PTS": "Points",
+    "REBOUNDS": "Rebounds", "REB": "Rebounds",
+    "ASSISTS": "Assists", "AST": "Assists",
+    "3PM": "3PM",
+    "PRA": "PRA", "P+R+A": "PRA",
+    "PR":  "PR",  "P+R":   "PR",
+    "PA":  "PA",  "P+A":   "PA",
+    "RA":  "RA",  "R+A":   "RA",
+}
+
+
 @app.route("/api/autopilot-slips")
 def api_autopilot_slips():
     slips      = load_slips()
     bets       = load_bets()
-    cutoff     = _rolling_7_cutoff()
     bet_lookup = _build_bet_lookup(bets)
 
     live    = [_enrich_slip(s, bet_lookup) for s in slips if s.get("status") == "live"   and s["result"] is None]
     active  = [_enrich_slip(s, bet_lookup) for s in slips if s.get("status") == "active" and s["result"] is None]
     settled = [_enrich_slip(s, bet_lookup) for s in slips if s["result"] is not None]
 
-    weekly_settled = [s for s in settled if s.get("settled_at", "")[:10] >= cutoff]
-    weekly_profit  = round(sum(
-        s.get("profit", 0) for s in weekly_settled
+    # All-time profit (not rolling 7-day)
+    total_profit = round(sum(
+        s.get("profit", 0) for s in settled
         if s["result"] != "refund" and s.get("profit") is not None
     ), 2)
 
@@ -208,7 +220,7 @@ def api_autopilot_slips():
     ud_2_rate     = slip_hit_rate([s for s in ud_settled if s["type"] == "2-pick"])
     ud_3_rate     = slip_hit_rate([s for s in ud_settled if s["type"] == "3-pick"])
 
-    # Individual leg hit rate — counts each leg separately (duplicates count twice)
+    # Individual leg hit rate — counts each leg separately
     all_leg_results = []
     for s in settled:
         if s.get("leg_results"):
@@ -216,6 +228,36 @@ def api_autopilot_slips():
     ind_hits  = sum(1 for r in all_leg_results if r == "hit")
     ind_total = len(all_leg_results)
     individual_hit_rate = round(ind_hits / ind_total * 100, 1) if ind_total > 0 else 0
+
+    # Per-stat leg hit rates
+    stat_buckets: dict = {}
+    for s in settled:
+        legs    = s.get("leg_results") or []
+        details = s.get("details") or []
+        for i, lr in enumerate(legs):
+            if lr not in ("hit", "miss") or i >= len(details):
+                continue
+            parts = details[i].split()
+            label = _DETAIL_STAT_LABELS.get(parts[-1].upper()) if parts else None
+            if not label:
+                continue
+            bucket = stat_buckets.setdefault(label, {"hits": 0, "misses": 0})
+            if lr == "hit":
+                bucket["hits"] += 1
+            else:
+                bucket["misses"] += 1
+
+    stat_hit_rates = sorted([
+        {
+            "stat":   stat,
+            "hits":   v["hits"],
+            "misses": v["misses"],
+            "total":  v["hits"] + v["misses"],
+            "rate":   round(v["hits"] / (v["hits"] + v["misses"]) * 100, 1),
+        }
+        for stat, v in stat_buckets.items()
+        if v["hits"] + v["misses"] >= 2
+    ], key=lambda x: x["rate"], reverse=True)
 
     total_open_ev = round(sum(s["ev"] for s in active), 2)
     total         = len(settled)
@@ -235,10 +277,11 @@ def api_autopilot_slips():
         "pp_3_rate":            pp_3_rate,
         "ud_2_rate":            ud_2_rate,
         "ud_3_rate":            ud_3_rate,
-        "two_leg_rate":         pp_2_rate,   # keep for backwards compat
+        "two_leg_rate":         pp_2_rate,
         "three_leg_rate":       pp_3_rate,
         "total_open_ev":        total_open_ev,
-        "weekly_profit":        weekly_profit,
+        "total_profit":         total_profit,
+        "stat_hit_rates":       stat_hit_rates,
     })
 
 
@@ -248,15 +291,13 @@ def api_autopilot_slips():
 def api_your_slips():
     slips      = load_your_slips()
     bets       = load_bets()
-    cutoff     = _rolling_7_cutoff()
     bet_lookup = _build_bet_lookup(bets)
 
     active  = [_enrich_slip(s, bet_lookup) for s in slips if s["result"] is None]
     settled = [_enrich_slip(s, bet_lookup) for s in slips if s["result"] is not None]
 
-    weekly_settled = [s for s in settled if s.get("settled_at", "")[:10] >= cutoff]
-    weekly_profit  = round(sum(
-        s.get("profit", 0) for s in weekly_settled
+    total_profit = round(sum(
+        s.get("profit", 0) for s in settled
         if s["result"] != "refund" and s.get("profit") is not None
     ), 2)
 
@@ -269,7 +310,7 @@ def api_your_slips():
         "settled":       settled[::-1],
         "total":         total,
         "hit_rate":      hit_rate,
-        "weekly_profit": weekly_profit,
+        "total_profit":  total_profit,
     })
 
 

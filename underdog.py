@@ -80,8 +80,12 @@ def get_ud_props():
                     under_price = opt.get("american_price")
                     under_mult = opt.get("payout_multiplier")
 
-            # Only include balanced lines (1.0x on both sides)
-            if over_mult != "1.0" or under_mult != "1.0":
+            # Only include balanced lines (1.0x on both sides) — compare as float
+            # to handle API returning int (1), float (1.0), or string ("1.0")
+            try:
+                if float(over_mult) != 1.0 or float(under_mult) != 1.0:
+                    continue
+            except (TypeError, ValueError):
                 continue
 
             results.append({

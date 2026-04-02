@@ -39,6 +39,7 @@ PUSHOVER_USERS = [
 ]
 
 alerted_slips = set()
+last_edges    = []
 
 STAT_LABEL_TO_KEY = {
     "POINTS": "points", "REBOUNDS": "rebounds", "ASSISTS": "assists",
@@ -163,11 +164,13 @@ def run():
             data_age = (datetime.now(timezone.utc) - last_updated).total_seconds()
             if data_age > DATA_MAX_AGE_SECS:
                 print(f"  [Slips] Skipping slip generation — FD/BetMGM data is {int(data_age)}s old (max {DATA_MAX_AGE_SECS}s)")
+                auto_generate_slips([])   # no new edges, but still promotes live → active
                 new_slips = []
             else:
                 new_slips = auto_generate_slips(all_edges)
         else:
             print(f"  [Slips] Skipping slip generation — FD/BetMGM data timestamp unknown")
+            auto_generate_slips([])       # no new edges, but still promotes live → active
             new_slips = []
         for slip in new_slips:
             if slip["key"] not in alerted_slips:
@@ -177,16 +180,43 @@ def run():
             # Add each leg as an individual tracked bet and collect real IDs
             collected_bet_ids = []
             for i, player in enumerate(slip["players"]):
-                # Try to find a matching edge directly
+                # Parse stat + direction from the slip detail for this leg
+                detail    = slip["details"][i]
+                d_parts   = detail.split()
+                slip_dir  = d_parts[0] if d_parts else None
+                slip_stat = STAT_LABEL_TO_KEY.get(d_parts[-1]) if d_parts else None
+                try:
+                    slip_line = float(d_parts[1]) if len(d_parts) > 1 else None
+                except ValueError:
+                    slip_line = None
+
+                # Try to find the exact matching edge (player + platform + stat + direction)
                 leg_edge = next(
                     (e for e in all_edges
                      if e["player"] == player
-                     and e["platform"] == slip["platform"]),
+                     and e["platform"] == slip["platform"]
+                     and e["stat"] == slip_stat
+                     and e["direction"] == slip_dir),
                     None
                 )
                 if leg_edge:
                     bet = add_bet(leg_edge)
-                    collected_bet_ids.append(bet["id"] if bet else None)
+                    if bet:
+                        collected_bet_ids.append(bet["id"])
+                        continue
+                    # add_bet returned None — either exact duplicate or one-bet-per-player.
+                    # Look for an existing active bet matching this leg exactly.
+                    all_bets   = load_bets()
+                    existing   = next(
+                        (b for b in all_bets
+                         if b["player"]    == player
+                         and b["stat"]      == slip_stat
+                         and b["direction"] == slip_dir
+                         and b["line"]      == slip_line
+                         and b["result"]    is None),
+                        None
+                    )
+                    collected_bet_ids.append(existing["id"] if existing else None)
                     continue
 
                 # Build a synthetic edge from slip details

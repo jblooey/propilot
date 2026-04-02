@@ -1,6 +1,7 @@
 import json
 import os
 import requests
+import unicodedata
 from datetime import datetime, date, timedelta
 
 BETS_FILE    = "bets.json"
@@ -505,7 +506,9 @@ def _fuzzy_find_player(player_name: str, player_stats: dict) -> dict | None:
     suffixes = {"ii", "iii", "iv", "jr", "sr"}
 
     def strip_punct(s: str) -> str:
-        """Remove periods and hyphens for comparison."""
+        """Remove periods, hyphens, and Unicode diacritics for comparison."""
+        s = unicodedata.normalize("NFD", s)
+        s = "".join(c for c in s if unicodedata.category(c) != "Mn")
         return s.replace(".", "").replace("-", "")
 
     def clean_parts(s: str) -> list[str]:
@@ -658,10 +661,9 @@ def auto_settle():
                 continue
 
             date_restricted_ids = {
-                gid for gid in completed_ids
-                if any(ev["id"] == gid
-                       for evs in [events_by_date.get(bet_game_date_str, [])]
-                       for ev in evs)
+                ev["id"]
+                for ev in events_by_date.get(bet_game_date_str, [])
+                if ev["id"] in completed_ids
             }
 
             if not date_restricted_ids:
@@ -676,9 +678,15 @@ def auto_settle():
                 stats = game_player_stats.get(game_id, {})
                 result, reason = calculate_result(bet, stats)
                 if result != "pending":
-                    # Confirm the team played if we have team info
-                    bet_team = bet.get("team", "")
-                    if bet_team and bet_team not in game_teams.get(game_id, set()):
+                    # Confirm the team played — use ESPN-derived abbrs (home_abbr/away_abbr)
+                    # to avoid mismatches with platform-scraped team codes (e.g. NY vs NYK)
+                    espn_teams = {bet.get("home_abbr", ""), bet.get("away_abbr", "")} - {""}
+                    bet_team   = bet.get("team", "")
+                    game_abbrs = game_teams.get(game_id, set())
+                    if espn_teams:
+                        if not espn_teams & game_abbrs:
+                            continue
+                    elif bet_team and bet_team not in game_abbrs:
                         continue
                     matched_stats = stats
                     break
@@ -691,10 +699,13 @@ def auto_settle():
 
         if matched_stats is None:
             # Player's team played but player not in box score → inactive scratch
-            bet_team = bet.get("team", "")
-            if bet_team:
+            # Use ESPN-derived abbrs (home_abbr/away_abbr) to avoid scraper mismatches
+            espn_teams = {bet.get("home_abbr", ""), bet.get("away_abbr", "")} - {""}
+            bet_team   = bet.get("team", "")
+            team_tokens = espn_teams if espn_teams else ({bet_team} if bet_team else set())
+            if team_tokens:
                 for gid in completed_ids:
-                    if bet_team in game_teams.get(gid, set()):
+                    if team_tokens & game_teams.get(gid, set()):
                         gd = bet.get("game_date", "").replace("-", "")
                         # Only void if the game was on the expected date (±1 day)
                         for date_str, events in events_by_date.items():
@@ -710,8 +721,9 @@ def auto_settle():
                                     bet["result"]     = "void"
                                     bet["reason"]     = "Inactive scratch (not in box score)"
                                     bet["settled_at"] = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+                                    team_disp = "/".join(sorted(team_tokens))
                                     print(f"  [VOID] {bet['player']} — inactive scratch "
-                                          f"({bet_team} played)")
+                                          f"({team_disp} played)")
                                     settled += 1
                                     break
             continue

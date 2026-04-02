@@ -223,7 +223,9 @@ def _build_anchor(event: dict, odds_data: dict) -> dict:
     if start_ts:
         try:
             dt_utc    = datetime.fromisoformat(start_ts.replace("Z", "+00:00"))
-            dt_et     = dt_utc - timedelta(hours=5)
+            # DST-aware ET offset: EDT (UTC-4) Mar–Nov, EST (UTC-5) Nov–Mar
+            et_offset = -4 if 3 <= dt_utc.month <= 11 else -5
+            dt_et     = dt_utc + timedelta(hours=et_offset)
             game_date = dt_et.strftime("%Y-%m-%d")
         except Exception:
             pass

@@ -44,7 +44,7 @@ def _find_entry(player_name, injury_map):
             if not inj_parts:
                 continue
             if (inj_parts[-1] == parts[-1] and
-                    inj_parts[0][:3] == parts[0][:3]):
+                    inj_parts[0] == parts[0]):
                 return inj_val
     return None
 

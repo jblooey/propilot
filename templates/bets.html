@@ -395,6 +395,69 @@ body {
 .plat-bar  { height: 100%; border-radius: 1px; transition: width 0.4s ease; }
 .plat-val  { font-size: 11px; font-weight: 600; color: var(--text-2); font-family: 'JetBrains Mono', monospace; min-width: 24px; text-align: right; }
 
+/* ── Filter bar ── */
+.filter-bar {
+  display: none;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.filter-bar.visible { display: flex; }
+.filter-group { display: flex; align-items: center; gap: 3px; }
+.filter-label { font-size: 10px; font-weight: 600; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; margin-right: 2px; }
+.filter-btn {
+  font-size: 10px; font-weight: 500; color: var(--text-3);
+  background: transparent; border: 1px solid var(--border-2);
+  border-radius: var(--r-sm); padding: 2px 7px; cursor: pointer;
+  transition: color var(--t), border-color var(--t), background var(--t);
+  font-family: 'JetBrains Mono', monospace;
+}
+.filter-btn:hover { color: var(--text-2); border-color: var(--border-2); }
+.filter-btn.active { color: var(--text-1); border-color: var(--accent); background: var(--accent-dim); }
+.filter-divider { width: 1px; height: 14px; background: var(--border); margin: 0 2px; }
+
+/* ── Day group headers ── */
+.day-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 4px 4px;
+}
+.day-header:first-child { padding-top: 4px; }
+.dh-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--text-4); white-space: nowrap;
+}
+.dh-line { flex: 1; height: 1px; background: var(--border); }
+.dh-pnl {
+  font-size: 10px; font-weight: 600; font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+.dh-pnl.pos { color: var(--green); }
+.dh-pnl.neg { color: var(--red); }
+.dh-pnl.neu { color: var(--text-4); }
+
+/* ── Top Stats sidebar rows ── */
+.stat-hit-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.shr-label {
+  font-size: 11px; color: var(--text-3); min-width: 40px;
+}
+.shr-bar-wrap {
+  flex: 1; height: 3px; background: var(--border-2); border-radius: 1px; overflow: hidden;
+}
+.shr-bar { height: 100%; border-radius: 1px; transition: width 0.4s ease; }
+.shr-val {
+  font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace;
+  min-width: 36px; text-align: right; color: var(--text-2);
+}
+.shr-val.g { color: var(--green); }
+.shr-val.a { color: var(--amber); }
+.shr-val.r { color: var(--red); }
+
 .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; gap: 5px; text-align: center; }
 .e-title { font-size: 12px; font-weight: 500; color: var(--text-4); }
 .e-sub   { font-size: 11px; color: var(--text-4); }
@@ -532,7 +595,7 @@ body {
   </div>
   <div class="unit-divider"></div>
   <div class="unit-stat">
-    <span class="us-label">7-Day P&L</span>
+    <span class="us-label">Total P&L</span>
     <span class="us-val" id="unitPnl">—</span>
   </div>
   <div class="unit-divider"></div>
@@ -606,6 +669,30 @@ body {
         </div>
       </div>
     </div>
+    <!-- Filter bar (Results tab only) -->
+    <div class="filter-bar" id="filterBar">
+      <span class="filter-label">Platform</span>
+      <div class="filter-group">
+        <button class="filter-btn active" data-filter="platform" data-val="all" onclick="setFilter('platform','all')">All</button>
+        <button class="filter-btn" data-filter="platform" data-val="PP" onclick="setFilter('platform','PP')">PP</button>
+        <button class="filter-btn" data-filter="platform" data-val="UD" onclick="setFilter('platform','UD')">UD</button>
+      </div>
+      <div class="filter-divider"></div>
+      <span class="filter-label">Type</span>
+      <div class="filter-group">
+        <button class="filter-btn active" data-filter="type" data-val="all" onclick="setFilter('type','all')">All</button>
+        <button class="filter-btn" data-filter="type" data-val="2-pick" onclick="setFilter('type','2-pick')">2-pick</button>
+        <button class="filter-btn" data-filter="type" data-val="3-pick" onclick="setFilter('type','3-pick')">3-pick</button>
+      </div>
+      <div class="filter-divider"></div>
+      <span class="filter-label">Result</span>
+      <div class="filter-group">
+        <button class="filter-btn active" data-filter="result" data-val="all" onclick="setFilter('result','all')">All</button>
+        <button class="filter-btn" data-filter="result" data-val="hit" onclick="setFilter('result','hit')">Hit</button>
+        <button class="filter-btn" data-filter="result" data-val="miss" onclick="setFilter('result','miss')">Miss</button>
+      </div>
+    </div>
+
     <div class="slips-list" id="slipsList">
       <div class="loading"><div class="spin"></div> Loading slips...</div>
     </div>
@@ -669,6 +756,15 @@ body {
 
     <div class="sidebar-card">
       <div class="sidebar-card-header">
+        <div class="sidebar-card-title">Top Stats</div>
+      </div>
+      <div class="sidebar-card-body" id="topStatsList">
+        <div class="e-sub" style="font-size:11px;color:var(--text-4);">No data yet</div>
+      </div>
+    </div>
+
+    <div class="sidebar-card">
+      <div class="sidebar-card-header">
         <div class="sidebar-card-title">Platform Split</div>
       </div>
       <div class="sidebar-card-body" id="platformSplit">
@@ -694,6 +790,7 @@ let currentTab = 'live';
 let slipsData  = { live: [], active: [], results: [] };
 let unitSize   = parseFloat(localStorage.getItem('propilot_unit') || '5');
 let stats      = {};
+let filters    = { platform: 'all', type: 'all', result: 'all' };
 
 document.getElementById('unitInput').value = unitSize;
 
@@ -724,9 +821,9 @@ function unitChanged() {
 }
 
 function updateUnitDisplay() {
-  if (stats.weekly_profit == null) return;
+  if (stats.total_profit == null) return;
   const baseStake = 5;
-  const profit    = (stats.weekly_profit / baseStake) * unitSize;
+  const profit    = (stats.total_profit / baseStake) * unitSize;
   const units     = profit / unitSize;
   const pnlEl     = document.getElementById('unitPnl');
   const unitEl    = document.getElementById('unitCount');
@@ -742,22 +839,51 @@ function getStakeForSlip(s) {
   return unitSize;
 }
 
+// ── Filter logic ───────────────────────────────────────────────────────────
+function setFilter(key, val) {
+  filters[key] = val;
+  // Update button active states for this filter group
+  document.querySelectorAll(`[data-filter="${key}"]`).forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val === val);
+  });
+  renderSlips();
+}
+
+function applyFilters(list) {
+  return list.filter(s => {
+    if (filters.platform !== 'all' && s.platform !== filters.platform) return false;
+    if (filters.type !== 'all' && s.type !== filters.type) return false;
+    if (filters.result !== 'all') {
+      if (filters.result === 'hit' && !s.result?.startsWith('hit')) return false;
+      if (filters.result === 'miss' && s.result !== 'miss') return false;
+    }
+    return true;
+  });
+}
+
 // ── Tab ────────────────────────────────────────────────────────────────────
 function setTab(tab) {
   currentTab = tab;
   document.getElementById('tabLive').className    = 'ptab' + (tab === 'live'    ? ' tab-live-active' : '');
   document.getElementById('tabActive').className  = 'ptab' + (tab === 'active'  ? ' tab-active' : '');
   document.getElementById('tabResults').className = 'ptab' + (tab === 'results' ? ' tab-active' : '');
+  const filterBar = document.getElementById('filterBar');
+  filterBar.classList.toggle('visible', tab === 'results');
   renderSlips();
 }
 
 // ── Render slips ───────────────────────────────────────────────────────────
 function renderSlips() {
   const el   = document.getElementById('slipsList');
-  const list = slipsData[currentTab] || [];
+  let   list = slipsData[currentTab] || [];
 
   const titles = { live: 'Live Slips', active: 'Active Slips', results: 'Slip Results' };
   document.getElementById('panelTitle').textContent = titles[currentTab];
+
+  if (currentTab === 'results') {
+    list = applyFilters(list);
+  }
+
   document.getElementById('panelCount').textContent = list.length;
 
   if (!list.length) {
@@ -771,7 +897,49 @@ function renderSlips() {
     return;
   }
 
-  el.innerHTML = list.map(s => renderSlipCard(s)).join('');
+  if (currentTab === 'results') {
+    // Group by settled_at date (YYYY-MM-DD)
+    const groups = {};
+    const order  = [];
+    for (const s of list) {
+      const dateKey = (s.settled_at || '').slice(0, 10) || 'Unknown';
+      if (!groups[dateKey]) { groups[dateKey] = []; order.push(dateKey); }
+      groups[dateKey].push(s);
+    }
+    let html = '';
+    for (const dateKey of order) {
+      const daySlips  = groups[dateKey];
+      const dayProfit = daySlips.reduce((acc, s) => {
+        if (s.result !== 'refund' && s.profit != null) {
+          return acc + (parseFloat(s.profit) / (s.stake || 5)) * unitSize;
+        }
+        return acc;
+      }, 0);
+      const label    = dateKey === 'Unknown' ? 'Unknown Date' : formatDayLabel(dateKey);
+      const pnlStr   = dayProfit !== 0
+        ? (dayProfit > 0 ? `+$${dayProfit.toFixed(2)}` : `-$${Math.abs(dayProfit).toFixed(2)}`)
+        : null;
+      const pnlClass = dayProfit > 0 ? 'pos' : dayProfit < 0 ? 'neg' : 'neu';
+      html += `<div class="day-header">
+        <span class="dh-label">${label}</span>
+        <div class="dh-line"></div>
+        ${pnlStr ? `<span class="dh-pnl ${pnlClass}">${pnlStr}</span>` : ''}
+      </div>`;
+      html += daySlips.map(s => renderSlipCard(s)).join('');
+    }
+    el.innerHTML = html;
+  } else {
+    el.innerHTML = list.map(s => renderSlipCard(s)).join('');
+  }
+}
+
+function formatDayLabel(dateStr) {
+  const d     = new Date(dateStr + 'T12:00:00');
+  const today = new Date(); today.setHours(12,0,0,0);
+  const yest  = new Date(today); yest.setDate(yest.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yest.toDateString())  return 'Yesterday';
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function renderSlipCard(s) {
@@ -928,6 +1096,23 @@ async function fetchSlips() {
     document.getElementById('udCount').textContent = udCount;
     document.getElementById('ppBar').style.width   = `${(ppCount / total) * 100}%`;
     document.getElementById('udBar').style.width   = `${(udCount / total) * 100}%`;
+
+    // Top Stats
+    const statRates = d.stat_hit_rates || [];
+    const topEl = document.getElementById('topStatsList');
+    if (statRates.length === 0) {
+      topEl.innerHTML = '<div class="e-sub" style="font-size:11px;color:var(--text-4);">No data yet</div>';
+    } else {
+      topEl.innerHTML = statRates.map(sr => {
+        const barColor = sr.rate >= 60 ? 'var(--green)' : sr.rate >= 50 ? 'var(--amber)' : 'var(--red)';
+        const valClass = sr.rate >= 60 ? 'g' : sr.rate >= 50 ? 'a' : 'r';
+        return `<div class="stat-hit-row">
+          <span class="shr-label">${sr.stat}</span>
+          <div class="shr-bar-wrap"><div class="shr-bar" style="width:${sr.rate}%;background:${barColor}"></div></div>
+          <span class="shr-val ${valClass}">${sr.rate}%</span>
+        </div>`;
+      }).join('');
+    }
 
     renderSlips();
   } catch(err) {

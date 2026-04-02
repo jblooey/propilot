@@ -108,6 +108,11 @@ def get_prizepicks_nba():
 
         if stat not in players[player_id]["props"]:
             players[player_id]["props"][stat] = line
+        else:
+            existing = players[player_id]["props"][stat]
+            if existing != line:
+                print(f"  [PrizePicks] Duplicate {player['name']} {stat}: "
+                      f"keeping {existing}, ignoring {line}")
 
     return list(players.values())
 

@@ -152,7 +152,8 @@ def auto_generate_slips(current_edges):
         save_slips(slips)
         print(f"  [SLIP] {transitioned} slip(s) promoted live → active")
 
-    existing_keys = {s.get("key") for s in slips}
+    # Normalize to lowercase so player-name casing differences don't create duplicates
+    existing_keys = {(s.get("key") or "").lower() for s in slips}
     new_slips     = []
 
     for platform in ("UD", "PP"):
@@ -200,12 +201,7 @@ def auto_generate_slips(current_edges):
             for combo in combinations(deduped_edges, n):
                 players     = [e["player"] for e in combo]
                 player_keys = [p.lower() for p in players]
-                teams = []
-                for e in combo:
-                    t = e.get("team")
-                    if not t:
-                        t = e.get("home_abbr") or e.get("away_abbr") or None
-                    teams.append(t)
+                teams = [e.get("team") or None for e in combo]
 
                 if any(p in committed_players for p in player_keys):
                     continue
@@ -284,7 +280,7 @@ def auto_generate_slips(current_edges):
                 if ev_pct < 10:
                     continue
 
-                key = f"{platform}:{','.join(sorted([e['player']+e['stat']+e['direction'] for e in combo]))}"
+                key = f"{platform}:{','.join(sorted([e['player'].lower()+e['stat']+e['direction'] for e in combo]))}"
                 if key in existing_keys:
                     continue
 
@@ -357,7 +353,7 @@ def auto_generate_slips(current_edges):
                 "settled_at":    None,
             }
             new_slips.append(slip)
-            existing_keys.add(cand["key"])
+            existing_keys.add(cand["key"].lower())
 
             for p in player_keys:
                 used_players_this_run.add(p)
@@ -703,7 +699,7 @@ def update_slips_from_edges(current_edges, sb_props=None):
 
             try:
                 platform_line = float(parts[1])
-            except:
+            except (ValueError, IndexError):
                 continue
 
             over_prob, under_prob, _, _ = weighted_consensus(
@@ -783,7 +779,7 @@ def update_your_slips_from_edges(current_edges, sb_props=None):
 
             try:
                 platform_line = float(parts[1])
-            except:
+            except (ValueError, IndexError):
                 continue
 
             over_prob, under_prob, _, _ = weighted_consensus(
