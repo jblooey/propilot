@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, request, redirect, url_for, flash
+from flask import Flask, jsonify, render_template, request, redirect, url_for
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash
 from bet_tracker import load_bets
@@ -370,12 +370,40 @@ def api_your_slips():
     hits     = [s for s in settled if s["result"] in ("hit", "hit-2", "hit-3")]
     hit_rate = round(len(hits) / total * 100, 1) if total > 0 else 0
 
+    def _slip_rate(lst):
+        t = len([s for s in lst if s["result"] != "refund"])
+        h = len([s for s in lst if s["result"] in ("hit", "hit-2", "hit-3")])
+        return round(h / t * 100, 1) if t > 0 else 0
+
+    pp_settled = [s for s in settled if s["platform"] == "PP"]
+    ud_settled = [s for s in settled if s["platform"] == "UD"]
+    pp_2_rate  = _slip_rate([s for s in pp_settled if s["type"] == "2-pick"])
+    pp_3_rate  = _slip_rate([s for s in pp_settled if s["type"] == "3-pick"])
+    ud_2_rate  = _slip_rate([s for s in ud_settled if s["type"] == "2-pick"])
+    ud_3_rate  = _slip_rate([s for s in ud_settled if s["type"] == "3-pick"])
+
+    # Individual leg hit rate
+    all_leg_results = []
+    for s in settled:
+        if s.get("leg_results"):
+            all_leg_results.extend([r for r in s["leg_results"] if r and r != "void"])
+    ind_hits  = sum(1 for r in all_leg_results if r == "hit")
+    ind_total = len(all_leg_results)
+    ind_rate  = round(ind_hits / ind_total * 100, 1) if ind_total > 0 else 0
+
     return jsonify({
-        "active":        active,
-        "settled":       settled[::-1],
-        "total":         total,
-        "hit_rate":      hit_rate,
-        "total_profit":  total_profit,
+        "active":               active,
+        "settled":              settled[::-1],
+        "total":                total,
+        "hit_rate":             hit_rate,
+        "total_profit":         total_profit,
+        "pp_2_rate":            pp_2_rate,
+        "pp_3_rate":            pp_3_rate,
+        "ud_2_rate":            ud_2_rate,
+        "ud_3_rate":            ud_3_rate,
+        "individual_hit_rate":  ind_rate,
+        "individual_hits":      ind_hits,
+        "individual_total":     ind_total,
     })
 
 

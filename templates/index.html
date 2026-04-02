@@ -110,10 +110,37 @@ body {
 .refresh-badge.stale { color: var(--amber); border-color: rgba(245,158,11,0.4); }
 
 /* ── Layout ── */
+/* ── Your Bets stats strip ── */
+.your-stats-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  padding: 10px 16px 0;
+}
+.ysc {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 2px solid rgba(34,211,238,0.20);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  position: relative; overflow: hidden;
+}
+.ysc::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(34,211,238,0.04) 0%, transparent 65%);
+  pointer-events: none;
+}
+.ysc-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-4); margin-bottom: 5px; }
+.ysc-value { font-size: 22px; font-weight: 700; color: var(--text-1); letter-spacing: -0.03em; line-height: 1; }
+.ysc-value.g { color: var(--green); }
+.ysc-value.r { color: var(--red); }
+.ysc-value.a { color: var(--amber); }
+.ysc-sub { font-size: 10px; color: var(--text-4); margin-top: 4px; }
+
 .layout {
   display: flex;
-  height: calc(100vh - 40px);
-  padding: 12px 16px;
+  height: calc(100vh - 40px - 82px);
+  padding: 10px 16px 12px;
   gap: 12px;
 }
 
@@ -739,6 +766,35 @@ body {
   </div>
 </div>
 
+<!-- Stats strip -->
+<div class="your-stats-strip">
+  <div class="ysc">
+    <div class="ysc-label">Leg Hit Rate</div>
+    <div class="ysc-value" id="ysIndRate">—</div>
+    <div class="ysc-sub" id="ysIndRecord">— of — legs</div>
+  </div>
+  <div class="ysc">
+    <div class="ysc-label">PP 2-Pick</div>
+    <div class="ysc-value" id="ysPP2">—</div>
+    <div class="ysc-sub">need 33.3% BE</div>
+  </div>
+  <div class="ysc">
+    <div class="ysc-label">PP 3-Pick</div>
+    <div class="ysc-value" id="ysPP3">—</div>
+    <div class="ysc-sub">need 16.7% BE</div>
+  </div>
+  <div class="ysc">
+    <div class="ysc-label">UD 2-Pick</div>
+    <div class="ysc-value" id="ysUD2">—</div>
+    <div class="ysc-sub">need 28.6% BE</div>
+  </div>
+  <div class="ysc">
+    <div class="ysc-label">UD 3-Pick</div>
+    <div class="ysc-value" id="ysUD3">—</div>
+    <div class="ysc-sub">need 15.4% BE</div>
+  </div>
+</div>
+
 <div class="layout">
 
   <!-- ── Edge feed ── -->
@@ -748,7 +804,7 @@ body {
         <div class="feed-title">Edge Feed</div>
         <span class="feed-count" id="edgeCount">0 edges</span>
         <span class="feed-hint">Click to select · 2 or 3 picks</span>
-        <span class="downtime-notice" id="downtimeNotice" style="display:none">&#9790; Data dormant 2–10 AM</span>
+        <span class="downtime-notice" id="downtimeNotice" style="display:none">&#9790; Data dormant 12–10 AM</span>
       </div>
       <div class="filter-tabs">
         <button class="ftab on" id="fAll" onclick="setFilter('all')">All</button>
@@ -817,7 +873,11 @@ body {
     <!-- Your Slips -->
     <div class="slips-card">
       <div class="slips-header">
-        <div class="slips-title">Your Slips</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="slips-title">Your Slips</div>
+          <span id="ysHitRate" style="font-size:10px;font-weight:600;color:var(--text-4);font-family:'JetBrains Mono',monospace;"></span>
+          <span id="ysPnl"     style="font-size:10px;font-weight:600;font-family:'JetBrains Mono',monospace;"></span>
+        </div>
         <div class="slips-tabs">
           <button class="stab on" id="stActive"  onclick="setSlipTab('active')">Active</button>
           <button class="stab"    id="stResults" onclick="setSlipTab('results')">Results</button>
@@ -1230,6 +1290,35 @@ async function fetchYourSlips() {
   try {
     const d = await (await fetch('/api/your-slips')).json();
     yourSlips = { active: d.active || [], settled: d.settled || [] };
+
+    // Stats strip
+    const setYsc = (id, val, be) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = val > 0 ? `${val}%` : '—';
+      el.className   = `ysc-value ${val >= be ? 'g' : val > 0 ? 'a' : ''}`;
+    };
+    const indEl = document.getElementById('ysIndRate');
+    const ir    = d.individual_hit_rate || 0;
+    indEl.textContent = ir > 0 ? `${ir}%` : '—';
+    indEl.className   = `ysc-value ${ir >= 55 ? 'g' : ir > 0 ? 'a' : ''}`;
+    document.getElementById('ysIndRecord').textContent =
+      d.individual_total > 0 ? `${d.individual_hits} of ${d.individual_total} legs` : '— of — legs';
+    setYsc('ysPP2', d.pp_2_rate, 33.3);
+    setYsc('ysPP3', d.pp_3_rate, 16.7);
+    setYsc('ysUD2', d.ud_2_rate, 28.6);
+    setYsc('ysUD3', d.ud_3_rate, 15.4);
+
+    // Slip header — hit rate + P&L
+    const hrEl = document.getElementById('ysHitRate');
+    if (hrEl) hrEl.textContent = d.total > 0 ? `${d.hit_rate}% (${d.total})` : '';
+    const pnlEl = document.getElementById('ysPnl');
+    if (pnlEl && d.total_profit != null) {
+      const p = d.total_profit;
+      pnlEl.textContent = p >= 0 ? `+$${p.toFixed(2)}` : `-$${Math.abs(p).toFixed(2)}`;
+      pnlEl.style.color = p > 0 ? 'var(--green)' : p < 0 ? 'var(--red)' : 'var(--text-4)';
+    }
+
     renderSlips();
   } catch {}
 }
