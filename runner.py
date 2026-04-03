@@ -152,26 +152,36 @@ def run():
         except Exception as cache_err:
             print(f"  [Cache] Failed to write edges: {cache_err}")
 
-        # Update active bet tracker
-        update_bets(all_edges)
+        # Always update active bet probs (even during quiet hours)
         recalculate_active_bets(sb_props)
 
-        # Auto-generate new slips and alert on new ones
-        # Skip if FD/BetMGM data is stale (>240s old) — stale lines mean EV calc is unreliable
-        DATA_MAX_AGE_SECS = 240
-        last_updated = _oddsapi._last_updated_at
-        if last_updated is not None:
-            data_age = (datetime.now(timezone.utc) - last_updated).total_seconds()
-            if data_age > DATA_MAX_AGE_SECS:
-                print(f"  [Slips] Skipping slip generation — FD/BetMGM data is {int(data_age)}s old (max {DATA_MAX_AGE_SECS}s)")
-                auto_generate_slips([])   # no new edges, but still promotes live → active
-                new_slips = []
-            else:
-                new_slips = auto_generate_slips(all_edges)
-        else:
-            print(f"  [Slips] Skipping slip generation — FD/BetMGM data timestamp unknown")
-            auto_generate_slips([])       # no new edges, but still promotes live → active
+        # Check if we're in quiet hours (midnight–10 AM ET) — no new bets or slips
+        in_quiet_hours = (DOWNTIME_START <= _et_hour() < DOWNTIME_END)
+
+        if in_quiet_hours:
+            print(f"  [Scheduler] Quiet hours (ET hour={_et_hour()}) — skipping bet/slip generation")
+            auto_generate_slips([])  # still promotes live → active, no new slips
             new_slips = []
+        else:
+            # Update active bet tracker (add new bets)
+            update_bets(all_edges)
+
+            # Auto-generate new slips and alert on new ones
+            # Skip if FD/BetMGM data is stale (>240s old) — stale lines mean EV calc is unreliable
+            DATA_MAX_AGE_SECS = 240
+            last_updated = _oddsapi._last_updated_at
+            if last_updated is not None:
+                data_age = (datetime.now(timezone.utc) - last_updated).total_seconds()
+                if data_age > DATA_MAX_AGE_SECS:
+                    print(f"  [Slips] Skipping slip generation — FD/BetMGM data is {int(data_age)}s old (max {DATA_MAX_AGE_SECS}s)")
+                    auto_generate_slips([])
+                    new_slips = []
+                else:
+                    new_slips = auto_generate_slips(all_edges)
+            else:
+                print(f"  [Slips] Skipping slip generation — FD/BetMGM data timestamp unknown")
+                auto_generate_slips([])
+                new_slips = []
         for slip in new_slips:
             if slip["key"] not in alerted_slips:
                 send_slip_alert(slip, data_updated_at=_oddsapi._last_updated_at)
@@ -421,7 +431,6 @@ def sleep_until_morning():
         print("  [Scheduler] Good morning — resuming.")
 
 while True:
-    sleep_until_morning()
     run()
     _oddsapi._sync_refresh_tracker()
 
