@@ -395,17 +395,29 @@ print("\nCommands: a=add bet  p=parlay  s=settle  r=results  q=quit")
 # Run immediately on startup, then sync to SGO refresh cycle
 import oddsapi as _oddsapi
 
-DOWNTIME_START = 0   # midnight local
-DOWNTIME_END   = 10  # 10 AM local
+DOWNTIME_START = 0   # midnight ET
+DOWNTIME_END   = 10  # 10 AM ET
+
+def _et_hour():
+    """Return current hour in US Eastern time (handles DST)."""
+    now_utc  = datetime.now(timezone.utc)
+    et_offset = -4 if 3 <= now_utc.month <= 11 else -5
+    return (now_utc.hour + et_offset) % 24
 
 def sleep_until_morning():
-    """If we're in the overnight window, sleep until 10 AM."""
-    now = datetime.now()
-    if DOWNTIME_START <= now.hour < DOWNTIME_END:
-        wake = now.replace(hour=DOWNTIME_END, minute=0, second=0, microsecond=0)
-        secs = (wake - now).total_seconds()
-        print(f"\n  [Scheduler] Overnight window — sleeping until 10:00 AM ({int(secs/3600)}h {int((secs%3600)/60)}m)")
-        time.sleep(secs)
+    """If we're in the overnight window (ET), sleep until 10 AM ET."""
+    et_hour = _et_hour()
+    if DOWNTIME_START <= et_hour < DOWNTIME_END:
+        now_utc   = datetime.now(timezone.utc)
+        # Calculate seconds until 10 AM ET
+        hours_left = (DOWNTIME_END - et_hour) % 24
+        # Find exact minute offset within current hour
+        mins_left  = 60 - now_utc.minute
+        secs_left  = (hours_left - 1) * 3600 + mins_left * 60 - now_utc.second
+        if secs_left < 0:
+            secs_left += 86400
+        print(f"\n  [Scheduler] Overnight window (ET hour={et_hour}) — sleeping {int(secs_left/3600)}h {int((secs_left%3600)/60)}m until 10:00 AM ET")
+        time.sleep(secs_left)
         print("  [Scheduler] Good morning — resuming.")
 
 while True:
