@@ -244,9 +244,9 @@ def api_last_update():
 
 # Maps the last word of a slip detail (e.g. "OVER 22.0 PA") to a display label
 _DETAIL_STAT_LABELS = {
-    "POINTS": "Points", "PTS": "Points",
-    "REBOUNDS": "Rebounds", "REB": "Rebounds",
-    "ASSISTS": "Assists", "AST": "Assists",
+    "POINTS": "Pts", "PTS": "Pts",
+    "REBOUNDS": "Rebs", "REB": "Rebs",
+    "ASSISTS": "Asts", "AST": "Asts",
     "3PM": "3PM",
     "PRA": "PRA", "P+R+A": "PRA",
     "PR":  "PR",  "P+R":   "PR",
