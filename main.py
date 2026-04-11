@@ -3,7 +3,6 @@ from underdog import get_ud_props
 from draftkings import get_dk_props
 from pinnacle import get_pinnacle_props
 from oddsapi import get_oddsapi_props
-from injuries import check_player_injury, check_team_uncertainty, STAR_UNCERTAINTY_BUMP
 from scipy.stats import norm
 from datetime import datetime, timezone
 
@@ -30,23 +29,28 @@ SIGMA = {
 }
 
 BOOK_WEIGHTS = {
-    "pinnacle":   0.21,
-    "fanduel":    0.30,
-    "draftkings": 0.23,
-    "betmgm":     0.15,
-    "underdog":   0.03,
-    "prizepicks": 0.03,
+    "pinnacle":   0.22,
+    "fanduel":    0.38,
+    "draftkings": 0.27,
+    "betmgm":     0.07,
+    "caesars":    0.06,
+    "underdog":   0.04,  # -115/-115 flat line, treated as market signal
+    "prizepicks": 0.04,  # -119/-119 flat line, treated as market signal
 }
+
+# Flat vig odds for DFS platforms (no two-sided market, fixed take rate)
+UD_DECIMAL  = round(100 / 115 + 1, 6)   # -115 → 1.869565
+PP_DECIMAL  = round(100 / 119 + 1, 6)   # -119 → 1.840336
 
 COMBO_STATS  = {"PRA", "PR", "PA", "RA"}
 SHARP_BOOKS  = {"fanduel"}
-SPORTSBOOKS  = {"pinnacle", "fanduel", "draftkings", "betmgm"}
+SPORTSBOOKS  = {"pinnacle", "fanduel", "draftkings", "betmgm", "caesars"}
 MIN_BOOKS    = 1
-MIN_PROB_PP  = 0.55
-MIN_PROB_UD  = 0.54
+MIN_PROB_PP  = 0.50
+MIN_PROB_UD  = 0.50
 
-MIN_PROB_PP_EARLY = 0.57
-MIN_PROB_UD_EARLY = 0.56
+MIN_PROB_PP_EARLY = 0.50
+MIN_PROB_UD_EARLY = 0.50
 
 WHOLE_NUMBER_THRESHOLD_BUMP = 0.01
 
@@ -280,12 +284,9 @@ def weighted_consensus(stat_data, platform_line, sigma):
     for book, data in stat_data.items():
         w = BOOK_WEIGHTS.get(book, 0.05)
 
-        if book == "pinnacle":
-            op = devig_additive(data["over_decimal"], data["under_decimal"])
-        else:
-            op = devig_multiplicative(data["over_decimal"], data["under_decimal"])
-            if pinnacle:
-                w *= 0.5
+        op = devig_multiplicative(data["over_decimal"], data["under_decimal"])
+        if book != "pinnacle" and pinnacle:
+            w *= 0.5
 
         weighted_prob += op * w
         weighted_line += data["line"] * w
@@ -315,14 +316,15 @@ def build_player_team_map():
     import requests
     player_team = {}
     try:
-        r     = requests.get("https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams")
+        r     = requests.get("https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams", timeout=10)
         teams = r.json().get("sports", [{}])[0].get("leagues", [{}])[0].get("teams", [])
         for team_entry in teams:
             team    = team_entry["team"]
             abbr    = team["abbreviation"]
             team_id = team["id"]
             rr = requests.get(
-                f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{team_id}/roster"
+                f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{team_id}/roster",
+                timeout=10
             )
             for athlete in rr.json().get("athletes", []):
                 name = athlete.get("displayName", "")
@@ -337,7 +339,7 @@ def build_player_team_map():
 # ── Edge finder ───────────────────────────────────────────────────────────────
 
 def find_edges(platform_props, sb_props, platform_name, ref_props=None,
-               player_team_map=None, injury_map=None):
+               player_team_map=None, stale_books=None):
     edges        = []
     ref_lookup   = build_ref_lookup(ref_props)
     # Use DST-aware ET hour so thresholds fire at the right time regardless of server timezone
@@ -362,13 +364,6 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
         if player_team_map:
             team = player_team_map.get(normalize_name(player))
 
-        inj_status = None
-        if injury_map:
-            should_suppress, inj_status = check_player_injury(player, injury_map)
-            if should_suppress:
-                print(f"  [Injuries] Suppressed {player} ({inj_status})")
-                continue
-
         # Match player to sb_props
         sb_entry = None
         for sb_name, sb_data in sb_props.items():
@@ -376,29 +371,71 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
                 sb_entry = sb_data
                 break
 
-        if not sb_entry:
-            continue
-
         # Fallback: use anchor-derived team if ESPN map missed this player
-        if not team:
-            team = sb_entry.get("anchor", {}).get("player_team", "") or None
+        if sb_entry:
+            if not team:
+                team = sb_entry.get("anchor", {}).get("player_team", "") or None
+            stat_data = sb_entry["props"].get(stat_key) or {}
+        else:
+            stat_data = {}
 
-        stat_data = sb_entry["props"].get(stat_key)
-        if not stat_data:
-            continue
+        # Remove stale books from consensus so stale lines don't skew probability
+        if stale_books:
+            stat_data = {k: v for k, v in stat_data.items() if k not in stale_books}
 
         sb_only = {k: v for k, v in stat_data.items() if k in SPORTSBOOKS}
-        tier1   = {k for k in sb_only if k in SHARP_BOOKS}
+        has_fd  = "fanduel" in sb_only
+        n_books = len(sb_only)
 
-        if not tier1:
+        # Look up ref line early so we can use it below
+        _ref = None
+        if ref_lookup:
+            norm_player = normalize_name(player)
+            ref_key = (norm_player, stat_key)
+            _ref = ref_lookup.get(ref_key)
+            if _ref is None:
+                for (rp, rs), rl in ref_lookup.items():
+                    if rs == stat_key and names_match(player, rp):
+                        _ref = rl
+                        break
+
+        # Need at least one source to proceed
+        if not sb_only and _ref is None:
+            continue
+
+        # Inject the ref platform (PP or UD) into stat_data with its flat vig odds.
+        # UD uses -115/-115 (UD_DECIMAL), PP uses -119/-119 (PP_DECIMAL).
+        # This lets it participate in weighted consensus as a real market signal.
+        stat_data_with_ref = dict(stat_data)
+        if _ref is not None:
+            ref_platform_key = "underdog" if platform_name == "PP" else "prizepicks"
+            ref_decimal = UD_DECIMAL if platform_name == "PP" else PP_DECIMAL
+            stat_data_with_ref[ref_platform_key] = {
+                "line":          _ref,
+                "over_decimal":  ref_decimal,
+                "under_decimal": ref_decimal,
+            }
+
+        # Count the ref platform as an extra source when its line disagrees (≥0.5)
+        ref_disagrees = _ref is not None and abs(_ref - platform_line) >= 0.5
+        effective_n_books = n_books + (1 if ref_disagrees else 0)
+
+        # has_sharp = recommended:
+        #   (a) FanDuel present + at least 1 other source (book or disagreeing ref), OR
+        #   (b) 3+ sources total
+        has_sharp = (has_fd and effective_n_books >= 2) or (effective_n_books >= 3)
+
+        # Need at least one source (sportsbook or ref platform) to form a consensus.
+        # If only the ref platform is available, has_sharp stays False → "All" only.
+        if not sb_only and _ref is None:
             continue
 
         adj_over_prob, adj_under_prob, avg_line, total_weight = weighted_consensus(
-            stat_data, platform_line, sigma
+            stat_data_with_ref, platform_line, sigma
         )
 
         def fmt_book(book_key, direction):
-            data = stat_data.get(book_key)
+            data = stat_data_with_ref.get(book_key)
             if not data:
                 return "-"
             odds = decimal_to_american(
@@ -406,18 +443,8 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
             )
             return f"{data['line']}/{odds}"
 
-        # Ref line lookup
-        ref_line = None
-        if ref_lookup:
-            norm_player = normalize_name(player)
-            ref_key     = (norm_player, stat_key)
-            if ref_key in ref_lookup:
-                ref_line = ref_lookup[ref_key]
-            else:
-                for (rp, rs), rl in ref_lookup.items():
-                    if rs == stat_key and names_match(player, rp):
-                        ref_line = rl
-                        break
+        # Ref line lookup (reuse _ref computed above for has_sharp)
+        ref_line = _ref if ref_lookup else None
 
         is_whole_number = (platform_line % 1 == 0)
 
@@ -429,15 +456,11 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
         if is_whole_number:
             min_prob += WHOLE_NUMBER_THRESHOLD_BUMP
 
-        star_risk = None
-        if injury_map and team:
-            q_players = check_team_uncertainty(team, injury_map)
-            if q_players:
-                star_risk = ", ".join(q_players[:2])
-                min_prob += STAR_UNCERTAINTY_BUMP / 100
-
         # Pull anchor from sb_entry (populated from oddsapi props in build_sb_props)
-        anchor = sb_entry.get("anchor", {})
+        anchor = sb_entry.get("anchor", {}) if sb_entry else {}
+
+        # ref platform key for fmt_book (the other DFS platform)
+        ref_book_key = "underdog" if platform_name == "PP" else "prizepicks"
 
         base_edge = {
             "platform":      platform_name,
@@ -452,9 +475,8 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
             "fd":            fmt_book("fanduel",    "OVER"),
             "dk":            fmt_book("draftkings", "OVER"),
             "mgm":           fmt_book("betmgm",     "OVER"),
+            "cae":           fmt_book("caesars",    "OVER"),
             "ref_line":      ref_line,
-            "injury_status": inj_status,
-            "star_risk":     star_risk,
             "whole_number":  is_whole_number,
             # Game anchor fields — passed through to bet_tracker
             "sgo_event_id":  anchor.get("sgo_event_id", ""),
@@ -470,10 +492,13 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
                  "direction":  "OVER",
                  "prob":       round(adj_over_prob * 100, 1),
                  "ref_agrees": (ref_line <= platform_line) if ref_line is not None else None,
+                 "has_sharp":  has_sharp,
                  "pin":        fmt_book("pinnacle",   "OVER"),
                  "fd":         fmt_book("fanduel",    "OVER"),
                  "dk":         fmt_book("draftkings", "OVER"),
                  "mgm":        fmt_book("betmgm",     "OVER"),
+                 "cae":        fmt_book("caesars",    "OVER"),
+                 ref_book_key: fmt_book(ref_book_key, "OVER"),
             }
             edges.append(e)
 
@@ -482,10 +507,13 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
                  "direction":  "UNDER",
                  "prob":       round(adj_under_prob * 100, 1),
                  "ref_agrees": (ref_line >= platform_line) if ref_line is not None else None,
+                 "has_sharp":  has_sharp,
                  "pin":        fmt_book("pinnacle",   "UNDER"),
                  "fd":         fmt_book("fanduel",    "UNDER"),
                  "dk":         fmt_book("draftkings", "UNDER"),
                  "mgm":        fmt_book("betmgm",     "UNDER"),
+                 "cae":        fmt_book("caesars",    "UNDER"),
+                 ref_book_key: fmt_book(ref_book_key, "UNDER"),
             }
             edges.append(e)
 
@@ -509,9 +537,9 @@ def print_edges(edges):
         print(f"  {title}")
         print(f"{'='*165}")
         print(f"{'PLAYER':<25} {'STAT':<10} {'O/U':<6} {'P-LINE':<8} {'PROB%':<7} {'BOOKS':<6} "
-              f"{'PINNACLE':<16} {'FANDUEL':<16} {'DRAFTKINGS':<16} {'BETMGM':<16} "
+              f"{'PINNACLE':<16} {'FANDUEL':<16} {'DRAFTKINGS':<16} {'BETMGM':<16} {'CAESARS':<16} "
               f"{'MATCHUP':<16} {ref_label}")
-        print(f"{'-'*165}")
+        print(f"{'-'*181}")
         for e in section_edges:
             ref_str   = "-"
             if e["ref_line"] is not None:
@@ -522,7 +550,7 @@ def print_edges(edges):
             matchup   = e.get("matchup", "-")
             print(f"{e['player']:<25} {e['stat']:<10} {e['direction']:<6} "
                   f"{e['platform_line']:<8} {e['prob']:<7} {e['books']:<6} "
-                  f"{e['pin']:<16} {e['fd']:<16} {e['dk']:<16} {e['mgm']:<16} "
+                  f"{e['pin']:<16} {e['fd']:<16} {e['dk']:<16} {e['mgm']:<16} {e.get('cae', '-'):<16} "
                   f"{matchup:<16} {ref_str}{star_str}{whole_str}")
 
     print_section(pp_edges, f"PRIZEPICKS — {len(pp_edges)} edges", "UD LINE")

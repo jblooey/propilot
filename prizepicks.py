@@ -1,6 +1,32 @@
 import requests
+import json
+import os
+from datetime import datetime, timezone
+
+PP_CACHE_FILE = os.path.join(os.path.dirname(__file__), "pp_props_cache.json")
+PP_CACHE_MAX_AGE = 1200  # 20 minutes
 
 def get_prizepicks_nba():
+    # Try cache first (populated by Mac pusher when server IP is blocked)
+    if os.path.exists(PP_CACHE_FILE):
+        try:
+            with open(PP_CACHE_FILE) as f:
+                cached = json.load(f)
+            updated_at = datetime.fromisoformat(cached["updated_at"]).replace(tzinfo=timezone.utc)
+            age = (datetime.now(timezone.utc) - updated_at).total_seconds()
+            if age < PP_CACHE_MAX_AGE:
+                players = cached["players"]
+                print(f"  [PrizePicks] Using cached data (age={int(age)}s, {len(players)} players)")
+                return players
+            else:
+                print(f"  [PrizePicks] Cache stale ({int(age)}s), trying direct fetch")
+        except Exception as e:
+            print(f"  [PrizePicks] Cache read error: {e}")
+
+    return _fetch_prizepicks_direct()
+
+
+def _fetch_prizepicks_direct():
     url = "https://api.prizepicks.com/projections"
 
     params = {
@@ -16,8 +42,14 @@ def get_prizepicks_nba():
         "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
 
-    response = requests.get(url, params=params, headers=headers)
-    data = response.json()
+    try:
+        response = requests.get(url, params=params, headers=headers, timeout=15)
+        data = response.json()
+    except Exception as e:
+        print(f"  [PrizePicks] Request failed: {e}")
+        return []
+
+    print(f"  [PrizePicks] status={response.status_code} data={len(data.get('data',[]))} included={len(data.get('included',[]))}")
 
     # ── Build player lookup ────────────────────────────────────────
     player_map = {}

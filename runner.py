@@ -30,8 +30,6 @@ from slip_tracker import (
     print_slips, create_slip, auto_generate_slips,
     link_bet_ids_to_slip,
 )
-from injuries import get_injury_report
-
 PUSHOVER_TOKEN = os.environ["PUSHOVER_TOKEN"]
 PUSHOVER_USERS = [
     os.environ["PUSHOVER_USER_JULIAN"],
@@ -78,6 +76,7 @@ def send_slip_alert(slip, data_updated_at=None):
 
     msg = "\n".join(lines)
 
+    # Pushover
     for user_key in PUSHOVER_USERS:
         r = requests.post("https://api.pushover.net/1/messages.json", data={
             "token":   PUSHOVER_TOKEN,
@@ -91,12 +90,46 @@ def send_slip_alert(slip, data_updated_at=None):
         else:
             print(f"  [SLIP ALERT FAILED] ...{user_key[-6:]} {r.status_code}")
 
+    # Web Push
+    try:
+        from app import send_web_push_to_all
+        platform_label = "PrizePicks" if slip["platform"] == "PP" else "Underdog"
+        title = f"🎯 {platform_label} {slip['type']} · EV {slip['ev_pct']:+.1f}%"
+        body_lines = [f"• {slip['players'][i]} {slip['details'][i]} — {slip['current_probs'][i]}%" for i in range(len(slip["players"]))]
+        sent = send_web_push_to_all(title, "\n".join(body_lines), url="/autopilot")
+        if sent:
+            print(f"  [WEB PUSH SENT] {sent} subscriber(s)")
+    except Exception as wp_err:
+        print(f"  [WEB PUSH ERROR] {wp_err}")
+
+
+def settle_only():
+    """Run just the settlement pass — no prop fetching, no new bets/slips."""
+    print("  [Settlement] Running settlement pass...")
+    try:
+        auto_settle()
+        update_slips(load_bets())
+        update_your_slips(load_bets())
+        print_active_bets()
+        with open("last_update.txt", "w") as f:
+            f.write(datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+        print("  [Settlement] Done.")
+    except Exception as ex:
+        print(f"  [Settlement] Error: {ex}")
+        import traceback
+        traceback.print_exc()
+
 
 def run():
     global last_edges
     print(f"\n{'#'*60}")
     print(f"  RUN AT {datetime.now().strftime('%I:%M:%S %p')}")
     print(f"{'#'*60}")
+
+    # Settlement always runs, even if prop fetching fails below
+    all_edges   = []
+    sharp_edges = []
+    sb_props    = {}
 
     try:
         print("Fetching DraftKings...")
@@ -114,9 +147,6 @@ def run():
         sb_props        = build_sb_props(dk_props, pinnacle_props, oddsapi_props)
         player_team_map = build_player_team_map()
 
-        print("Fetching injury report...")
-        injury_map = get_injury_report()
-
         print("Fetching PrizePicks...")
         pp_props = get_prizepicks_props()
         print(f"  {len(pp_props)} props")
@@ -128,43 +158,58 @@ def run():
         pp_flat = flatten_pp_props(pp_props)
         ud_flat = ud_props
 
+        stale_books = _oddsapi.get_stale_books()
+        if stale_books:
+            print(f"  [OddsAPI] Stale books excluded from consensus: {', '.join(stale_books)}")
+
         pp_edges = find_edges(
             pp_flat, sb_props, "PP",
             ref_props=ud_flat,
             player_team_map=player_team_map,
-            injury_map=injury_map,
+            stale_books=stale_books,
         )
         ud_edges = find_edges(
             ud_flat, sb_props, "UD",
             ref_props=pp_flat,
             player_team_map=player_team_map,
-            injury_map=injury_map,
+            stale_books=stale_books,
         )
 
-        all_edges  = ud_edges + pp_edges
+        all_edges        = ud_edges + pp_edges
+        sharp_edges      = [e for e in all_edges if e.get("has_sharp")]
         last_edges = all_edges
         print_edges(all_edges)
 
-        # Write edges to cache for web app
+        # Write edges + book freshness to cache for web app
         try:
+            now_utc = datetime.now(timezone.utc)
+            book_ages = {}
+            for bk, ts in _oddsapi._book_updated_at.items():
+                if ts:
+                    book_ages[bk] = int((now_utc - ts).total_seconds())
+            cache_payload = {
+                "edges": all_edges,
+                "book_ages": book_ages,
+                "stale_books": list(stale_books),
+            }
             with open("edges_cache.json", "w") as f:
-                json.dump(all_edges, f)
+                json.dump(cache_payload, f)
         except Exception as cache_err:
             print(f"  [Cache] Failed to write edges: {cache_err}")
 
         # Always update active bet probs (even during quiet hours)
         recalculate_active_bets(sb_props)
 
-        # Check if we're in quiet hours (midnight–10 AM ET) — no new bets or slips
-        in_quiet_hours = (DOWNTIME_START <= _et_hour() < DOWNTIME_END)
+        # Check if we're in quiet hours (11:59 PM–9 AM ET) — no new bets or slips
+        in_quiet_hours = _in_quiet_hours()
 
         if in_quiet_hours:
-            print(f"  [Scheduler] Quiet hours (ET hour={_et_hour()}) — skipping bet/slip generation")
+            print(f"  [Scheduler] Quiet hours (PT hour={_pt_hour()}) — skipping bet/slip generation")
             auto_generate_slips([])  # still promotes live → active, no new slips
             new_slips = []
         else:
-            # Update active bet tracker (add new bets)
-            update_bets(all_edges)
+            # Update active bet tracker (add new bets) — sharp edges only
+            update_bets(sharp_edges)
 
             # Auto-generate new slips and alert on new ones
             # Skip if FD/BetMGM data is stale (>240s old) — stale lines mean EV calc is unreliable
@@ -177,7 +222,7 @@ def run():
                     auto_generate_slips([])
                     new_slips = []
                 else:
-                    new_slips = auto_generate_slips(all_edges)
+                    new_slips = auto_generate_slips(sharp_edges)
             else:
                 print(f"  [Slips] Skipping slip generation — FD/BetMGM data timestamp unknown")
                 auto_generate_slips([])
@@ -291,8 +336,6 @@ def run():
                     "mgm": fmt("betmgm"),
                     "ref_line": None,
                     "ref_agrees": None,
-                    "injury_status": None,
-                    "star_risk": None,
                     "sgo_event_id": anchor.get("sgo_event_id", ""),
                     "home_abbr": anchor.get("home_abbr", ""),
                     "away_abbr": anchor.get("away_abbr", ""),
@@ -311,19 +354,21 @@ def run():
         update_your_slips_from_edges(all_edges, sb_props)
         print_slips()
 
-        # Auto-settle completed games
+    except Exception as ex:
+        print(f"[ERROR in prop fetch/edge phase] {ex}")
+        import traceback
+        traceback.print_exc()
+
+    # Settlement always runs regardless of whether prop fetching succeeded
+    try:
         auto_settle()
         update_slips(load_bets())
         update_your_slips(load_bets())
-        # Print active bets
         print_active_bets()
-
-        # Write last update timestamp for web app
         with open("last_update.txt", "w") as f:
-            f.write(datetime.now().strftime("%Y-%m-%d %I:%M:%S %p"))
-
+            f.write(datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     except Exception as ex:
-        print(f"[ERROR] {ex}")
+        print(f"[ERROR in settlement phase] {ex}")
         import traceback
         traceback.print_exc()
 
@@ -396,62 +441,75 @@ def input_loop():
 
 
 
-# Input loop in background thread
-input_thread = threading.Thread(target=input_loop, daemon=True)
-input_thread.start()
-
-print("\nCommands: a=add bet  p=parlay  s=settle  r=results  q=quit")
-
 # Run immediately on startup, then sync to SGO refresh cycle
 import oddsapi as _oddsapi
 
-DOWNTIME_START = 0   # midnight ET
-DOWNTIME_END   = 10  # 10 AM ET
+# Quiet hours: 11:59 PM – 9:00 AM ET
+DOWNTIME_START_H, DOWNTIME_START_M = 23, 59
+DOWNTIME_END_H,   DOWNTIME_END_M   =  9,  0
 
-def _et_hour():
-    """Return current hour in US Eastern time (handles DST)."""
-    now_utc  = datetime.now(timezone.utc)
-    et_offset = -4 if 3 <= now_utc.month <= 11 else -5
-    return (now_utc.hour + et_offset) % 24
+def _pt_hour():
+    """Return current hour in US Pacific time (handles DST)."""
+    now_utc   = datetime.now(timezone.utc)
+    pt_offset = -7 if 3 <= now_utc.month <= 11 else -8
+    return (now_utc.hour + pt_offset) % 24
+
+def _pt_minutes():
+    """Return minutes since midnight PT."""
+    now_utc   = datetime.now(timezone.utc)
+    pt_offset = -7 if 3 <= now_utc.month <= 11 else -8
+    pt_hour   = (now_utc.hour + pt_offset) % 24
+    return pt_hour * 60 + now_utc.minute
+
+def _in_quiet_hours():
+    m     = _pt_minutes()
+    start = DOWNTIME_START_H * 60 + DOWNTIME_START_M  # 1439
+    end   = DOWNTIME_END_H   * 60 + DOWNTIME_END_M    # 540
+    return m >= start or m < end
 
 def sleep_until_morning():
-    """If we're in the overnight window (ET), sleep until 10 AM ET."""
-    et_hour = _et_hour()
-    if DOWNTIME_START <= et_hour < DOWNTIME_END:
-        now_utc   = datetime.now(timezone.utc)
-        # Calculate seconds until 10 AM ET
-        hours_left = (DOWNTIME_END - et_hour) % 24
-        # Find exact minute offset within current hour
-        mins_left  = 60 - now_utc.minute
-        secs_left  = (hours_left - 1) * 3600 + mins_left * 60 - now_utc.second
+    """If we're in the overnight window (PT), sleep until 9 AM PT."""
+    if _in_quiet_hours():
+        now_utc    = datetime.now(timezone.utc)
+        pt_offset  = -7 if 3 <= now_utc.month <= 11 else -8
+        pt_hour    = (now_utc.hour + pt_offset) % 24
+        end_mins   = DOWNTIME_END_H * 60 + DOWNTIME_END_M
+        cur_mins   = pt_hour * 60 + now_utc.minute
+        secs_left  = ((end_mins - cur_mins) % (24 * 60)) * 60 - now_utc.second
         if secs_left < 0:
             secs_left += 86400
-        print(f"\n  [Scheduler] Overnight window (ET hour={et_hour}) — sleeping {int(secs_left/3600)}h {int((secs_left%3600)/60)}m until 10:00 AM ET")
+        print(f"\n  [Scheduler] Overnight window (PT hour={pt_hour}) — sleeping {int(secs_left/3600)}h {int((secs_left%3600)/60)}m until 9:00 AM PT")
         time.sleep(secs_left)
         print("  [Scheduler] Good morning — resuming.")
 
-while True:
-    run()
-    _oddsapi._sync_refresh_tracker()
+if __name__ == "__main__":
+    if sys.stdin.isatty():
+        input_thread = threading.Thread(target=input_loop, daemon=True)
+        input_thread.start()
+        print("\nCommands: a=add bet  p=parlay  s=settle  r=results  q=quit")
 
-    # Sleep until 30s after SGO next refreshes
-    next_refresh = _oddsapi._sgo_next_refresh_at
-    last_updated = _oddsapi._last_updated_at
-    age_str = ""
-    if last_updated:
-        age_secs = (datetime.now(timezone.utc) - last_updated).total_seconds()
-        age_str = f" | Data age: {int(age_secs)}s"
+    while True:
+        run()
+        _oddsapi._sync_refresh_tracker()
 
-    if next_refresh is not None:
-        now = datetime.now(timezone.utc)
-        wait_secs = (next_refresh - now).total_seconds()
-        if wait_secs > 0:
-            next_local = next_refresh.astimezone().strftime("%I:%M:%S %p")
-            print(f"\n  [Scheduler] Next run at ~{next_local} (in {int(wait_secs)}s){age_str}")
-            time.sleep(wait_secs)
+        # Sleep until 30s after SGO next refreshes
+        next_refresh = _oddsapi._sgo_next_refresh_at
+        last_updated = _oddsapi._last_updated_at
+        age_str = ""
+        if last_updated:
+            age_secs = (datetime.now(timezone.utc) - last_updated).total_seconds()
+            age_str = f" | Data age: {int(age_secs)}s"
+
+        if next_refresh is not None:
+            now = datetime.now(timezone.utc)
+            wait_secs = (next_refresh - now).total_seconds()
+            if wait_secs > 0:
+                next_local = next_refresh.astimezone().strftime("%I:%M:%S %p")
+                print(f"\n  [Scheduler] Next run at ~{next_local} (in {int(wait_secs)}s){age_str}")
+                time.sleep(wait_secs)
+            else:
+                print(f"\n  [Scheduler] Running immediately{age_str}")
+                time.sleep(5)
         else:
-            print(f"\n  [Scheduler] Running immediately{age_str}")
-            time.sleep(5)
-    else:
-        print(f"\n  [Scheduler] Waiting 10 minutes{age_str}")
-        time.sleep(600)
+            print(f"\n  [Scheduler] Waiting 10 minutes{age_str}")
+            time.sleep(600)

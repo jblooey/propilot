@@ -210,6 +210,20 @@ def _get_team_abbrs_from_event(event: dict) -> set:
 
 # ── Game anchor matching ──────────────────────────────────────────────────────
 
+# Sportsbook scrapers use different abbreviations than ESPN for a handful of teams.
+# Map scraper abbrs → ESPN abbrs so anchor matching works correctly.
+_ABBR_TO_ESPN = {
+    "NYK": "NY",   # Knicks: sportsbooks use NYK, ESPN uses NY
+    "NOP": "NO",   # Pelicans: sportsbooks use NOP, ESPN uses NO
+    "UTA": "UTAH", # Jazz: sportsbooks sometimes use UTA, ESPN uses UTAH
+    "SAS": "SA",   # Spurs: sportsbooks use SAS, ESPN uses SA
+    "GS":  "GSW",  # Warriors: some books use GS, ESPN uses GSW
+}
+
+def _normalize_abbr(abbr: str) -> str:
+    return _ABBR_TO_ESPN.get(abbr.upper(), abbr.upper())
+
+
 def find_espn_game_for_bet(bet: dict, events_by_date: dict) -> dict | None:
     """
     Find the ESPN game event that matches a bet's anchor data.
@@ -230,7 +244,7 @@ def find_espn_game_for_bet(bet: dict, events_by_date: dict) -> dict | None:
     if not home_abbr or not away_abbr:
         return None
 
-    target_abbrs = {home_abbr, away_abbr}
+    target_abbrs = {_normalize_abbr(home_abbr), _normalize_abbr(away_abbr)}
 
     # Build date window: stored date ± 1 day to handle timezone edge cases
     try:

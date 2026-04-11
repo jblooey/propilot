@@ -49,7 +49,10 @@ body {
   background: var(--bg);
   color: var(--text-1);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   font-size: 13px;
   animation: pageIn 220ms ease both;
 }
@@ -62,6 +65,7 @@ body {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 20px;
   position: sticky; top: 0; z-index: 200;
+  flex-shrink: 0;
 }
 .logo { display: flex; align-items: center; gap: 8px; }
 .logo-mark {
@@ -103,6 +107,7 @@ body {
   border-bottom: 1px solid var(--border);
   padding: 7px 20px;
   display: flex; align-items: center; gap: 14px;
+  flex-shrink: 0;
 }
 .unit-label { font-size: 10px; font-weight: 600; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; }
 .unit-inputs { display: flex; align-items: center; gap: 4px; }
@@ -135,22 +140,31 @@ body {
 /* ── Stats row ── */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr;
   gap: 8px;
   padding: 10px 20px 0;
+  flex-shrink: 0;
 }
 .stat-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-top: 2px solid rgba(34,211,238,0.20);
+  border-top: 2px solid var(--border-2);
   border-radius: var(--r);
   padding: 12px 14px;
   position: relative;
   overflow: hidden;
+  transition: border-top-color 300ms;
 }
-.stat-card::before {
+.stat-card.above { border-top-color: var(--green); }
+.stat-card.below { border-top-color: var(--red); }
+.stat-card.above::before {
   content: ''; position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 50% 0%, rgba(34,211,238,0.05) 0%, transparent 65%);
+  background: radial-gradient(ellipse at 50% 0%, rgba(34,197,94,0.06) 0%, transparent 65%);
+  pointer-events: none;
+}
+.stat-card.below::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(239,68,68,0.05) 0%, transparent 65%);
   pointer-events: none;
 }
 .sc-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-4); margin-bottom: 6px; }
@@ -161,19 +175,37 @@ body {
 .sc-value.accent { color: var(--accent); }
 .sc-sub { font-size: 10px; color: var(--text-4); margin-top: 5px; }
 .sc-sub.breakeven { font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+.sc-be-badge {
+  display: inline-block; margin-top: 6px;
+  font-size: 10px; font-weight: 600; font-family: 'JetBrains Mono', monospace;
+  padding: 2px 5px; border-radius: 3px;
+}
+.sc-be-badge.above { color: var(--green); background: var(--green-dim); }
+.sc-be-badge.below { color: var(--red);   background: var(--red-dim); }
+
+.plat-pill { font-size: 9px; font-weight: 700; font-family: 'JetBrains Mono', monospace; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.06em; }
+.pp-pill { color: #a78bfa; background: rgba(124,58,237,0.12); border: 1px solid rgba(124,58,237,0.35); }
+.ud-pill { color: #fbbf24; background: rgba(217,119,6,0.12);  border: 1px solid rgba(217,119,6,0.35); }
+.stat-card.pp-card { border-top-color: rgba(124,58,237,0.45); }
+.stat-card.ud-card { border-top-color: rgba(217,119,6,0.45); }
+.stat-card.pp-card.above { border-top-color: var(--green); }
+.stat-card.pp-card.below { border-top-color: var(--red); }
+.stat-card.ud-card.above { border-top-color: var(--green); }
+.stat-card.ud-card.below { border-top-color: var(--red); }
 
 /* ── Prob classes ── */
-.prob-high { color: var(--text-1); }
-.prob-mid  { color: var(--text-1); }
-.prob-norm { color: var(--text-2); }
-.prob-dim  { color: var(--text-4); }
+.prob-green   { color: var(--green); }
+.prob-red     { color: var(--red); }
+.prob-neutral { color: var(--text-3); }
 
 /* ── Main layout ── */
 .main-layout {
   display: flex;
   padding: 10px 20px 16px;
   gap: 12px;
-  height: calc(100vh - 40px - 41px - 86px);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ── Slips panel ── */
@@ -192,8 +224,7 @@ body {
   display: flex; align-items: center; justify-content: space-between;
   flex-shrink: 0;
 }
-.panel-title { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.07em; display: flex; align-items: center; gap: 8px; }
-.panel-title::after { content: ''; display: block; height: 1px; width: 28px; background: repeating-linear-gradient(90deg, var(--text-4) 0, var(--text-4) 3px, transparent 3px, transparent 7px); }
+.panel-title { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.07em; }
 .panel-tabs { display: flex; align-items: center; gap: 0; height: 100%; }
 .ptab {
   font-size: 12px; font-weight: 500;
@@ -352,6 +383,8 @@ body {
   width: 240px; flex-shrink: 0;
   display: flex; flex-direction: column; gap: 8px;
   overflow-y: auto;
+  min-height: 0;
+  align-self: stretch;
 }
 .stats-sidebar::-webkit-scrollbar { width: 3px; }
 .stats-sidebar::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
@@ -582,6 +615,25 @@ body {
       Autopilot Active
     </div>
     <div class="topbar-ts" id="ts">--:-- --</div>
+    <button onclick="openVideoModal()" style="background:none;border:1px solid var(--border-2);border-radius:var(--r);cursor:pointer;font-size:11px;color:var(--text-3);font-family:'Inter',sans-serif;padding:3px 8px;transition:border-color 150ms,color 150ms;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--text-1)'" onmouseout="this.style.borderColor='var(--border-2)';this.style.color='var(--text-3)'">▶ Overview</button>
+    <button id="notifBtn" onclick="toggleNotifications()" title="Get a browser notification whenever a new Autopilot slip is generated" style="background:none;border:1px solid var(--border-2);border-radius:var(--r);cursor:pointer;font-size:11px;color:var(--text-3);font-family:'Inter',sans-serif;transition:color 150ms ease,border-color 150ms ease;padding:3px 8px;">🔔 Slip alerts</button>
+    <a href="/logout" style="font-size:11px;color:var(--text-4);text-decoration:none;transition:color 150ms ease;" onmouseover="this.style.color='var(--text-2)'" onmouseout="this.style.color='var(--text-4)'">Sign out</a>
+  </div>
+</div>
+
+<!-- Video modal -->
+<div id="videoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1000;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:10px;width:100%;max-width:760px;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
+      <div style="font-size:13px;font-weight:600;color:var(--text-1);">Propilot Overview</div>
+      <button onclick="closeVideoModal()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-3);line-height:1;">✕</button>
+    </div>
+    <div style="position:relative;padding-bottom:56.25%;height:0;">
+      <iframe id="videoIframe" src="" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position:absolute;top:0;left:0;width:100%;height:100%;"></iframe>
+    </div>
+    <div style="padding:14px 16px;display:flex;justify-content:flex-end;">
+      <button onclick="closeVideoModal()" style="background:var(--accent);border:none;border-radius:var(--r);cursor:pointer;font-size:13px;font-weight:600;color:#0f0f11;font-family:'Inter',sans-serif;padding:7px 18px;">Continue to Propilot</button>
+    </div>
   </div>
 </div>
 
@@ -612,30 +664,44 @@ body {
 
 <!-- Stats row -->
 <div class="stats-row">
-  <div class="stat-card">
+  <div class="stat-card" id="cardLeg">
     <div class="sc-label">Leg Hit Rate</div>
-    <div class="sc-value" id="statIndHitRate">—</div>
-    <div class="sc-sub" id="statIndRecord">— of — legs</div>
+    <div style="display:flex;align-items:baseline;gap:8px;">
+      <div class="sc-value" id="statIndHitRate">—</div>
+      <div style="font-size:11px;color:var(--text-4);font-family:'JetBrains Mono',monospace;" id="statIndRecord">— of — legs</div>
+    </div>
   </div>
-  <div class="stat-card">
-    <div class="sc-label">PP 2-Pick</div>
-    <div class="sc-value" id="statPP2">—</div>
-    <div class="sc-sub breakeven">need 33.3% BE</div>
-  </div>
-  <div class="stat-card">
-    <div class="sc-label">PP 3-Pick</div>
+  <div class="stat-card pp-card" id="cardPP3">
+    <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+      <span class="plat-pill pp-pill">PrizePicks</span>
+      <span class="sc-label" style="margin-bottom:0;">3-Pick · 6x</span>
+    </div>
     <div class="sc-value" id="statPP3">—</div>
-    <div class="sc-sub breakeven">need 16.7% BE</div>
+    <div class="sc-be-badge" id="bePP3">need 16.7%</div>
   </div>
-  <div class="stat-card">
-    <div class="sc-label">UD 2-Pick</div>
+  <div class="stat-card ud-card" id="cardUD2">
+    <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+      <span class="plat-pill ud-pill">Underdog</span>
+      <span class="sc-label" style="margin-bottom:0;">2-Pick · 3.5x</span>
+    </div>
     <div class="sc-value" id="statUD2">—</div>
-    <div class="sc-sub breakeven">need 28.6% BE</div>
+    <div class="sc-be-badge" id="beUD2">need 28.6%</div>
   </div>
-  <div class="stat-card">
-    <div class="sc-label">UD 3-Pick</div>
+  <div class="stat-card ud-card" id="cardUD3">
+    <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+      <span class="plat-pill ud-pill">Underdog</span>
+      <span class="sc-label" style="margin-bottom:0;">3-Pick · 6.5x</span>
+    </div>
     <div class="sc-value" id="statUD3">—</div>
-    <div class="sc-sub breakeven">need 15.4% BE</div>
+    <div class="sc-be-badge" id="beUD3">need 15.4%</div>
+  </div>
+  <div class="stat-card pp-card" id="cardPP2" style="display:none">
+    <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+      <span class="plat-pill pp-pill">PrizePicks</span>
+      <span class="sc-label" style="margin-bottom:0;">2-Pick · 3x</span>
+    </div>
+    <div class="sc-value" id="statPP2">—</div>
+    <div class="sc-be-badge" id="bePP2">need 33.3%</div>
   </div>
 </div>
 
@@ -713,49 +779,21 @@ body {
       </div>
       <div class="sidebar-card-body">
         <div class="stat-row-item">
-          <span class="sri-label">Total slips</span>
-          <span class="sri-val" id="sbTotal">—</span>
+          <span class="sri-label">Slip record</span>
+          <span class="sri-val" id="sbRecord">—</span>
         </div>
         <div class="stat-row-item">
-          <span class="sri-label">All-time hit rate</span>
-          <span class="sri-val" id="sbHitRate">—</span>
+          <span class="sri-label">Slip win rate</span>
+          <span class="sri-val" id="sbWinRate">—</span>
         </div>
         <div class="divider"></div>
         <div class="stat-row-item">
-          <span class="sri-label">Hits</span>
-          <span class="sri-val g" id="sbHits">—</span>
-        </div>
-        <div class="stat-row-item">
-          <span class="sri-label">Misses</span>
-          <span class="sri-val r" id="sbMisses">—</span>
+          <span class="sri-label">Total P&L</span>
+          <span class="sri-val" id="sbPnl">—</span>
         </div>
         <div class="stat-row-item">
           <span class="sri-label">Refunds</span>
           <span class="sri-val" id="sbRefunds">—</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="sidebar-card">
-      <div class="sidebar-card-header">
-        <div class="sidebar-card-title">Breakeven Rates</div>
-      </div>
-      <div class="sidebar-card-body">
-        <div class="breakeven-row">
-          <span class="be-label">PP 2-Pick · 3x</span>
-          <span class="be-val">33.3%</span>
-        </div>
-        <div class="breakeven-row">
-          <span class="be-label">PP 3-Pick · 6x</span>
-          <span class="be-val">16.7%</span>
-        </div>
-        <div class="breakeven-row">
-          <span class="be-label">UD 2-Pick · 3.5x</span>
-          <span class="be-val">28.6%</span>
-        </div>
-        <div class="breakeven-row">
-          <span class="be-label">UD 3-Pick · 6.5x</span>
-          <span class="be-val">15.4%</span>
         </div>
       </div>
     </div>
@@ -806,8 +844,15 @@ const STAT_LABELS = {
 };
 
 // ── Prob class helper ──────────────────────────────────────────────────────
-function probClass(p) {
-  return p >= 62 ? 'prob-high' : p >= 57 ? 'prob-mid' : p >= 52 ? 'prob-norm' : 'prob-dim';
+// Thresholds = lowest breakeven per platform:
+//   UD: 2-pick Standard = 53.5%
+//   PP: 5-pick Flex / 6-pick Flex = 54.2%
+const PROB_THRESHOLD = { PP: 54.2, UD: 53.5 };
+function probClass(p, platform) {
+  const t = PROB_THRESHOLD[platform] ?? 53.5;
+  if (p >= t)       return 'prob-green';   // at or above lowest breakeven
+  if (p >= t - 0.5) return 'prob-neutral'; // within 0.5% below breakeven
+  return 'prob-red';                       // more than 0.5% below breakeven
 }
 
 // ── Unit size ──────────────────────────────────────────────────────────────
@@ -827,10 +872,13 @@ function unitChanged() {
 }
 
 function updateUnitDisplay() {
-  if (stats.total_profit == null) return;
-  const baseStake = 5;
-  const profit    = (stats.total_profit / baseStake) * unitSize;
-  const units     = profit / unitSize;
+  const allSettled = [...(slipsData.results || [])].filter(s => s.result && s.result !== 'refund' && s.profit != null);
+  const profit = allSettled.reduce((acc, s) => {
+    const serverStake = s.stake || 5;
+    const clientStake = getStakeForSlip(s);
+    return acc + (parseFloat(s.profit) / serverStake) * clientStake;
+  }, 0);
+  const units = profit / unitSize;
   const pnlEl     = document.getElementById('unitPnl');
   const unitEl    = document.getElementById('unitCount');
   pnlEl.textContent = profit >= 0 ? `+$${profit.toFixed(2)}` : `-$${Math.abs(profit).toFixed(2)}`;
@@ -841,8 +889,13 @@ function updateUnitDisplay() {
 }
 
 // ── Stake scaling ──────────────────────────────────────────────────────────
+const STAKE_RATIO_BY_TYPE = {
+  '2-pick': 1.0, '3-pick': 2/3, '4-pick': 2/3, '5-pick': 2/3, '6-pick': 2/3,
+  '3-pick-flex': 2/3, '4-pick-flex': 2/3, '5-pick-flex': 2/3, '6-pick-flex': 2/5,
+};
 function getStakeForSlip(s) {
-  return unitSize;
+  const ratio = s.stake_ratio ?? STAKE_RATIO_BY_TYPE[s.type] ?? 2/3;
+  return Math.round(ratio * unitSize * 100) / 100;
 }
 
 // ── Filter logic ───────────────────────────────────────────────────────────
@@ -894,7 +947,7 @@ function renderSlips() {
 
   if (!list.length) {
     const msgs = {
-      live:    ['No flights on the runway', 'Awaiting departure — slips appear after the next refresh'],
+      live:    ['No live slips', 'New slips appear after each refresh'],
       active:  ['No active slips', 'Live slips move here after the next refresh cycle'],
       results: ['No results yet', 'Slips settle automatically after games end'],
     };
@@ -917,7 +970,7 @@ function renderSlips() {
       const daySlips  = groups[dateKey];
       const dayProfit = daySlips.reduce((acc, s) => {
         if (s.result !== 'refund' && s.profit != null) {
-          return acc + (parseFloat(s.profit) / (s.stake || 5)) * unitSize;
+          return acc + (parseFloat(s.profit) / (s.stake || 5)) * getStakeForSlip(s);
         }
         return acc;
       }, 0);
@@ -951,13 +1004,21 @@ function formatDayLabel(dateStr) {
 function renderSlipCard(s) {
   const isLive   = currentTab === 'live';
   const stake    = getStakeForSlip(s);
-  const evPct    = s.ev_pct != null ? parseFloat(s.ev_pct) : 0;
+  // For settled slips show actual realized EV; for live/active show projected
+  let evPct, evDollar;
+  if (s.result && s.profit != null) {
+    const scaledProfit = (parseFloat(s.profit) / (s.stake || 5)) * stake;
+    evPct    = scaledProfit / stake * 100;
+    evDollar = scaledProfit >= 0 ? `+$${scaledProfit.toFixed(2)}` : `-$${Math.abs(scaledProfit).toFixed(2)}`;
+  } else {
+    evPct    = s.ev_pct != null ? parseFloat(s.ev_pct) : 0;
+    const scaledEv = s.ev != null ? (parseFloat(s.ev) / (s.stake || 5)) * stake : null;
+    evDollar = scaledEv != null
+      ? (scaledEv >= 0 ? `+$${scaledEv.toFixed(2)}` : `-$${Math.abs(scaledEv).toFixed(2)}`)
+      : '—';
+  }
   const evClass  = evPct === 0 ? 'neu' : evPct > 0 ? 'pos' : 'neg';
   const evStr    = `${evPct >= 0 ? '+' : ''}${evPct.toFixed(1)}%`;
-  const scaledEv = s.ev != null ? (parseFloat(s.ev) / (s.stake || 5)) * stake : null;
-  const evDollar = scaledEv != null
-    ? (scaledEv >= 0 ? `+$${scaledEv.toFixed(2)}` : `-$${Math.abs(scaledEv).toFixed(2)}`)
-    : '—';
 
   const liveBadge = isLive
     ? `<span class="live-badge-sm"><span class="live-pulse-dot"></span>Live</span>`
@@ -979,7 +1040,7 @@ function renderSlipCard(s) {
         <span class="leg-detail-txt">${s.details[i]}</span>
       </div>
       <div class="leg-prob-right">
-        <span class="leg-prob-val ${probClass(prob)}">${prob}%</span>
+        <span class="leg-prob-val ${probClass(prob, s.platform)}">${prob}%</span>
         <span class="leg-delta ${dc}">${ds}</span>
       </div>
     </div>`;
@@ -994,7 +1055,7 @@ function renderSlipCard(s) {
       'miss':   { cls: 'miss',   label: '\u2717 Miss' },
       'refund': { cls: 'refund', label: '\u2205 Refund' },
     };
-    const r            = rMap[s.result] || { cls: 'miss', label: s.result };
+    const r            = rMap[s.result] || (s.result.startsWith('hit') ? { cls: 'hit', label: `\u2713 ${s.result.replace('hit-', '')}/${s.type.split('-')[0]} Hit` } : { cls: 'miss', label: s.result });
     const scaledProfit = s.profit != null ? (parseFloat(s.profit) / (s.stake || 5)) * stake : null;
     const profitStr    = scaledProfit != null
       ? ` \u00b7 ${scaledProfit >= 0 ? '+' : ''}$${scaledProfit.toFixed(2)}`
@@ -1058,18 +1119,27 @@ async function fetchSlips() {
     document.getElementById('statIndRecord').textContent =
       d.individual_total > 0 ? `${d.individual_hits} of ${d.individual_total} legs` : '— of — legs';
 
-    const pp2El = document.getElementById('statPP2');
-    const pp3El = document.getElementById('statPP3');
-    const ud2El = document.getElementById('statUD2');
-    const ud3El = document.getElementById('statUD3');
-    pp2El.textContent = d.pp_2_rate > 0 ? `${d.pp_2_rate}%` : '—';
-    pp2El.className   = `sc-value ${d.pp_2_rate >= 33.3 ? 'g' : d.pp_2_rate > 0 ? 'a' : ''}`;
-    pp3El.textContent = d.pp_3_rate > 0 ? `${d.pp_3_rate}%` : '—';
-    pp3El.className   = `sc-value ${d.pp_3_rate >= 16.7 ? 'g' : d.pp_3_rate > 0 ? 'a' : ''}`;
-    ud2El.textContent = d.ud_2_rate > 0 ? `${d.ud_2_rate}%` : '—';
-    ud2El.className   = `sc-value ${d.ud_2_rate >= 28.6 ? 'g' : d.ud_2_rate > 0 ? 'a' : ''}`;
-    ud3El.textContent = d.ud_3_rate > 0 ? `${d.ud_3_rate}%` : '—';
-    ud3El.className   = `sc-value ${d.ud_3_rate >= 15.4 ? 'g' : d.ud_3_rate > 0 ? 'a' : ''}`;
+    function setCard(cardId, valId, badgeId, rate, be) {
+      const card  = document.getElementById(cardId);
+      const valEl = document.getElementById(valId);
+      const badge = document.getElementById(badgeId);
+      const hasData = rate > 0;
+      const above   = hasData && rate >= be;
+      valEl.textContent = hasData ? `${rate}%` : '—';
+      valEl.className   = `sc-value ${above ? 'g' : hasData ? 'r' : ''}`;
+      if (card) {
+        card.classList.toggle('above', above);
+        card.classList.toggle('below', hasData && !above);
+      }
+      if (badge) {
+        badge.className   = `sc-be-badge ${above ? 'above' : hasData ? 'below' : ''}`;
+        badge.textContent = above ? `▲ ${be}% BE` : hasData ? `▼ need ${be}%` : `need ${be}%`;
+      }
+    }
+    setCard('cardPP2', 'statPP2', 'bePP2', d.pp_2_rate, 33.3);
+    setCard('cardPP3', 'statPP3', 'bePP3', d.pp_3_rate, 16.7);
+    setCard('cardUD2', 'statUD2', 'beUD2', d.ud_2_rate, 28.6);
+    setCard('cardUD3', 'statUD3', 'beUD3', d.ud_3_rate, 15.4);
 
     // Tab counts
     document.getElementById('countLive').textContent   = slipsData.live.length;
@@ -1083,15 +1153,42 @@ async function fetchSlips() {
 
     updateUnitDisplay();
 
-    document.getElementById('sbTotal').textContent   = d.total || 0;
     const hits    = settled.filter(s => s.result && s.result.startsWith('hit')).length;
     const misses  = settled.filter(s => s.result === 'miss').length;
     const refunds = settled.filter(s => s.result === 'refund').length;
-    document.getElementById('sbTotal').textContent   = d.total || 0;
-    document.getElementById('sbHitRate').textContent = d.total > 0 ? `${d.hit_rate}%` : '—';
-    document.getElementById('sbHits').textContent    = hits;
-    document.getElementById('sbMisses').textContent  = misses;
-    document.getElementById('sbRefunds').textContent = refunds;
+    const winRate = (hits + misses) > 0 ? Math.round(hits / (hits + misses) * 100) : null;
+    const totalPnl = d.total_profit != null ? d.total_profit : null;
+
+    const recEl = document.getElementById('sbRecord');
+    if ((hits + misses) > 0) {
+      recEl.innerHTML = `<span style="color:var(--green)">${hits}</span><span style="color:var(--text-3)">–</span><span style="color:var(--red)">${misses}</span>`;
+    } else {
+      recEl.textContent = '—';
+    }
+    recEl.className = 'sri-val';
+
+    const wrEl = document.getElementById('sbWinRate');
+    wrEl.textContent = winRate != null ? `${winRate}%` : '—';
+    wrEl.className = `sri-val ${winRate != null ? 'g' : ''}`;
+
+    // Scale P&L by current unit size using per-slip stake ratios
+    const allSettled = [...(slipsData.results || [])].filter(s => s.result && s.result !== 'refund' && s.profit != null);
+    const scaledPnl = allSettled.reduce((acc, s) => {
+      const serverStake = s.stake || 5;
+      const clientStake = getStakeForSlip(s);
+      return acc + (parseFloat(s.profit) / serverStake) * clientStake;
+    }, 0);
+    const pnlEl = document.getElementById('sbPnl');
+    pnlEl.textContent = scaledPnl >= 0 ? `+$${scaledPnl.toFixed(2)}` : `-$${Math.abs(scaledPnl).toFixed(2)}`;
+    pnlEl.className = `sri-val ${scaledPnl > 0 ? 'g' : scaledPnl < 0 ? 'r' : ''}`;
+    document.getElementById('sbRefunds').textContent = refunds || '—';
+
+    // Per-type hit rates
+    const typeRows = [
+      { label: 'PP 3-Pick · 6x',   key: 'pp_3_stats', be: 16.7 },
+      { label: 'UD 2-Pick · 3.5x', key: 'ud_2_stats', be: 28.6 },
+      { label: 'UD 3-Pick · 6.5x', key: 'ud_3_stats', be: 15.4 },
+    ];
 
     const allSlips = [...slipsData.live, ...slipsData.active, ...slipsData.results];
     const ppCount  = allSlips.filter(s => s.platform === 'PP').length;
@@ -1156,6 +1253,122 @@ document.querySelectorAll('.nav-link').forEach(link => {
     setTimeout(() => { window.location.href = link.href; }, 160);
   });
 });
+
+// ── Overview video modal ───────────────────────────────────────────────────
+const VIDEO_URL = 'https://www.loom.com/embed/51aad10df62e4931a9f2973647a6628b';
+const INTRO_KEY = 'propilot_seen_intro';
+
+function openVideoModal() {
+  const modal = document.getElementById('videoModal');
+  document.getElementById('videoIframe').src = VIDEO_URL;
+  modal.style.display = 'flex';
+}
+
+function closeVideoModal() {
+  const modal = document.getElementById('videoModal');
+  modal.style.display = 'none';
+  document.getElementById('videoIframe').src = '';
+  localStorage.setItem(INTRO_KEY, '1');
+}
+
+document.getElementById('videoModal').addEventListener('click', function(e) {
+  if (e.target === this) closeVideoModal();
+});
+
+// ── Web Push notifications ─────────────────────────────────────────────────
+const NOTIF_KEY = 'propilot_notif_enabled';
+
+async function toggleNotifications() {
+  const btn = document.getElementById('notifBtn');
+  const enabled = localStorage.getItem(NOTIF_KEY) === '1';
+
+  if (enabled) {
+    try {
+      const reg  = await navigator.serviceWorker.ready;
+      const sub  = await reg.pushManager.getSubscription();
+      if (sub) {
+        await fetch('/api/push-unsubscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        });
+        await sub.unsubscribe();
+      }
+    } catch(e) { console.warn('Unsubscribe error:', e); }
+    localStorage.removeItem(NOTIF_KEY);
+    updateNotifBtn();
+    return;
+  }
+
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    alert('Push notifications not supported in this browser.');
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') {
+    alert('Notification permission denied.');
+    return;
+  }
+
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+
+    const { key } = await (await fetch('/api/vapid-public-key')).json();
+    const appServerKey = urlBase64ToUint8Array(key);
+
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: appServerKey,
+    });
+
+    const subJson = {
+      endpoint: sub.endpoint,
+      keys: {
+        p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('p256dh')))),
+        auth:   btoa(String.fromCharCode(...new Uint8Array(sub.getKey('auth')))),
+      },
+    };
+    await fetch('/api/push-subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(subJson),
+    });
+
+    localStorage.setItem(NOTIF_KEY, '1');
+    updateNotifBtn();
+  } catch(e) {
+    console.error('Push subscribe error:', e);
+    alert('Could not enable notifications: ' + e.message);
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw     = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+function updateNotifBtn() {
+  const btn = document.getElementById('notifBtn');
+  const on = localStorage.getItem(NOTIF_KEY) === '1';
+  btn.textContent    = on ? '🔔 Alerts on' : '🔔 Slip alerts';
+  btn.style.color    = on ? 'var(--green)' : 'var(--text-3)';
+  btn.style.borderColor = on ? 'rgba(34,197,94,0.4)' : 'var(--border-2)';
+  btn.onmouseenter = () => { btn.style.borderColor = on ? 'rgba(34,197,94,0.7)' : 'var(--accent)'; btn.style.color = on ? 'var(--green)' : 'var(--text-1)'; };
+  btn.onmouseleave = () => { btn.style.borderColor = on ? 'rgba(34,197,94,0.4)' : 'var(--border-2)'; btn.style.color = on ? 'var(--green)' : 'var(--text-3)'; };
+}
+
+(async function initNotifBtn() {
+  updateNotifBtn();
+  if (localStorage.getItem(NOTIF_KEY) === '1') {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  }
+})();
 </script>
 </body>
 </html>

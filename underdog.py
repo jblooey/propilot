@@ -16,6 +16,8 @@ FILTER_IDS = {
     "rebounds":  "0d33e7f2-6601-486b-9f9e-cbe268d8fc88",
     "assists":   "e3bc1aaa-7964-4a84-bcfa-2d92a4d477a2",
     "pra":       "590e7c83-99fc-419f-bdd8-78bb0a691f8b",
+    "pr":        "cd25de54-fbb4-4111-85ac-60a347a8728f",
+    "pa":        "80eee07b-f568-4dad-81f6-b05e42aae24e",
     "ra":        "e5346095-1c5e-40f0-bb31-95181490038d",
     "threes":    "4295c94a-3110-417e-953f-a4f3ed0dd18b",
 }

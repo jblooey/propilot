@@ -7,27 +7,68 @@ SLIPS_FILE      = "autopilot_slips.json"
 YOUR_SLIPS_FILE = "your_slips.json"
 STAKE = 5.0
 
-PP_MULTIPLIERS = {"2-pick": 3.0, "3-pick": 6.0}
-UD_MULTIPLIERS = {"2-pick": 3.5, "3-pick": 6.5}
-
-MIN_PROB_10_PCT = {
-    "PP": {"2-pick": 0.60553, "3-pick": 0.568086},
-    "UD": {"2-pick": 0.560612, "3-pick": 0.553129},
+# ── Payout tables ────────────────────────────────────────────────────────────
+PP_POWER_MULT = {
+    "2-pick": 3.0, "3-pick": 6.0, "4-pick": 10.0, "5-pick": 20.0, "6-pick": 37.5,
+}
+PP_FLEX_PAYOUTS = {
+    "3-pick-flex": {3: 3.0,  2: 1.0},
+    "4-pick-flex": {4: 6.0,  3: 1.5},
+    "5-pick-flex": {5: 10.0, 4: 2.0,  3: 0.4},
+    "6-pick-flex": {6: 25.0, 5: 2.0,  4: 0.4},
+}
+UD_STANDARD_MULT = {
+    "2-pick": 3.5, "3-pick": 6.5, "4-pick": 10.0, "5-pick": 20.0, "6-pick": 35.0,
+}
+UD_FLEX_PAYOUTS = {
+    "3-pick-flex": {3: 3.25, 2: 1.09},
+    "4-pick-flex": {4: 6.0,  3: 1.5},
+    "5-pick-flex": {5: 10.0, 4: 2.5},
+    "6-pick-flex": {6: 25.0, 5: 2.6,  4: 0.25},
 }
 
-MIN_PROB_30_PCT = {
-    "PP": {"2-pick": 0.632456, "3-pick": 0.584804},
-    "UD": {"2-pick": 0.58554, "3-pick": 0.569407},
+# Backward compat aliases used in old code paths
+PP_MULTIPLIERS = PP_POWER_MULT
+UD_MULTIPLIERS = UD_STANDARD_MULT
+
+# Breakeven avg prob per leg (used as pre-filter in auto_generate)
+# PP optimal: 5-pick-flex (54.2%), 6-pick-flex (54.2%), 6-pick power (54.7%)
+# UD optimal: 2-pick (53.5%), 3-pick (53.6%), 6-pick-flex (53.8%)
+AUTOPILOT_SLIP_TYPES = {
+    "PP": ("3-pick", "5-pick-flex", "6-pick-flex"),
+    "UD": ("2-pick", "3-pick", "6-pick-flex"),
+}
+AUTOPILOT_MIN_AVG_PROB = {
+    "PP": {"3-pick": 0.551, "5-pick-flex": 0.542, "6-pick-flex": 0.542},
+    "UD": {"2-pick": 0.535, "3-pick": 0.536, "6-pick-flex": 0.538},
 }
 
-NEGATIVE_CORR_PAIRS = [
-    ("assists", "UNDER", "points", "OVER"),
-    ("points", "OVER", "assists", "UNDER"),
-    ("ra", "UNDER", "points", "OVER"),
-    ("points", "OVER", "ra", "UNDER"),
-    ("pra", "UNDER", "points", "OVER"),
-    ("points", "OVER", "pra", "UNDER"),
-]
+# Stake ratios relative to 1 unit (UD 2-pick = 1.0 unit)
+# PP/UD 3-pick = 2/3, PP 5-pick flex = 2/3, PP/UD 6-pick flex = 2/5
+STAKE_RATIO_BY_TYPE = {
+    "2-pick":       1.0,
+    "3-pick":       2/3,
+    "4-pick":       2/3,
+    "5-pick":       2/3,
+    "6-pick":       2/3,
+    "3-pick-flex":  2/3,
+    "4-pick-flex":  2/3,
+    "5-pick-flex":  2/3,
+    "6-pick-flex":  2/5,
+}
+BASE_UNIT = 7.50  # server-side default unit size ($)
+
+def stake_for_type(slip_type, unit=BASE_UNIT):
+    return round(STAKE_RATIO_BY_TYPE.get(slip_type, 2/3) * unit, 2)
+
+# Keep for backward compat
+STAKE_BY_TYPE = {k: round(v * BASE_UNIT, 2) for k, v in STAKE_RATIO_BY_TYPE.items()}
+
+# Minimum EV% floor before a slip is generated
+MIN_EV_PCT = 8.0
+
+MAX_PLAYERS_PER_TEAM_GLOBAL    = 3
+MAX_PLAYERS_PER_MATCHUP_GLOBAL = 4
 
 STAT_NORMALIZE = {
     # Internal display format (from create_your_slip / autopilot)
@@ -82,12 +123,40 @@ def calc_joint_prob(probs):
     return result
 
 
+def _n_picks(slip_type):
+    return int(slip_type.split("-")[0])
+
+def _is_flex(slip_type):
+    return slip_type.endswith("-flex")
+
+def _flex_payouts(platform, slip_type):
+    return PP_FLEX_PAYOUTS.get(slip_type, {}) if platform == "PP" else UD_FLEX_PAYOUTS.get(slip_type, {})
+
+def _power_mult(platform, slip_type):
+    return PP_POWER_MULT.get(slip_type, 6.0) if platform == "PP" else UD_STANDARD_MULT.get(slip_type, 6.5)
+
+def _calc_flex_ev(platform, slip_type, probs, stake):
+    from math import comb
+    n = _n_picks(slip_type)
+    payouts = _flex_payouts(platform, slip_type)
+    jp = calc_joint_prob(probs)
+    p_avg = jp ** (1 / n)  # geometric mean
+    expected = sum(
+        comb(n, hits) * (p_avg ** hits) * ((1 - p_avg) ** (n - hits)) * mult * stake
+        for hits, mult in payouts.items()
+    )
+    ev     = round(expected - stake, 2)
+    ev_pct = round((expected - stake) / stake * 100, 1)
+    return ev, ev_pct, round(jp * 100, 2)
+
 def calc_ev(platform, slip_type, probs, stake):
-    jp      = calc_joint_prob(probs)
-    mult    = PP_MULTIPLIERS[slip_type] if platform == "PP" else UD_MULTIPLIERS[slip_type]
-    payout  = jp * stake * mult
-    ev      = round(payout - stake, 2)
-    ev_pct  = round((payout - stake) / stake * 100, 1)
+    if _is_flex(slip_type):
+        return _calc_flex_ev(platform, slip_type, probs, stake)
+    jp     = calc_joint_prob(probs)
+    mult   = _power_mult(platform, slip_type)
+    payout = jp * stake * mult
+    ev     = round(payout - stake, 2)
+    ev_pct = round((payout - stake) / stake * 100, 1)
     return ev, ev_pct, round(jp * 100, 2)
 
 
@@ -100,34 +169,25 @@ def _payout_for_result(slip, result):
         return stake, 0.0
     if result == "miss":
         return 0.0, round(-stake, 2)
-    if result in ("hit", "hit-2", "hit-3", "hit-4", "hit-5"):
-        effective_type = "2-pick" if result == "hit-2" else slip_type
-        mult   = PP_MULTIPLIERS[effective_type] if platform == "PP" else UD_MULTIPLIERS[effective_type]
-        payout = round(stake * mult, 2)
-        profit = round(payout - stake, 2)
-        return payout, profit
 
-    return 0.0, round(-stake, 2)
+    if _is_flex(slip_type):
+        n    = _n_picks(slip_type)
+        hits = n if result == "hit" else int(result.split("-")[1])
+        mult = _flex_payouts(platform, slip_type).get(hits, 0.0)
+    else:
+        # Power/Standard — "hit" = full payout, "hit-k" = voided down to k-pick
+        if result == "hit":
+            mult = _power_mult(platform, slip_type)
+        else:
+            k    = int(result.split("-")[1])
+            mult = _power_mult(platform, f"{k}-pick")
+
+    payout = round(stake * mult, 2)
+    profit = round(payout - stake, 2)
+    return payout, profit
 
 
-def check_correlation(bets):
-    team_counts = {}
-    for b in bets:
-        team = b.get("team", b["player"])
-        team_counts[team] = team_counts.get(team, 0) + 1
-    for team, count in team_counts.items():
-        if count > 1:
-            return False, "2+ players from same team"
-
-    for i, b1 in enumerate(bets):
-        for b2 in bets[i+1:]:
-            if b1.get("team") and b1.get("team") == b2.get("team"):
-                pair = (b1["stat"], b1["direction"], b2["stat"], b2["direction"])
-                if pair in NEGATIVE_CORR_PAIRS:
-                    return False, (
-                        f"Negative correlation: {b1['player']} {b1['stat']} "
-                        f"{b1['direction']} vs {b2['player']} {b2['stat']} {b2['direction']}"
-                    )
+def check_correlation(_bets):
     return True, None
 
 
@@ -138,6 +198,24 @@ def slip_key(platform, bet_ids):
 # ── Auto-generate slips ───────────────────────────────────────────────────────
 
 def auto_generate_slips(current_edges):
+    from datetime import datetime, timezone
+
+    # Only generate slips for today's games (ET).
+    # Sportsbooks post tomorrow's lines overnight — this prevents the system from
+    # locking in slips for next-day games before the market has priced them accurately.
+    _now_utc  = datetime.now(timezone.utc)
+    _et_offset = -4 if 3 <= _now_utc.month <= 11 else -5
+    _today_et = (_now_utc.hour + _et_offset) % 24
+    # If it's before 5 AM ET, "today" for game purposes is still yesterday's slate
+    _et_date  = _now_utc.date() if _today_et >= 5 else (_now_utc.date() - __import__('datetime').timedelta(days=1))
+    today_str = _et_date.isoformat()
+
+    before = len(current_edges)
+    current_edges = [e for e in current_edges if e.get("game_date") == today_str]
+    filtered = before - len(current_edges)
+    if filtered:
+        print(f"  [SLIP] Filtered {filtered} edge(s) for non-today game_date (today ET = {today_str})")
+
     slips = load_slips()
 
     # ── Status transition: live → active ──────────────────────────────────────
@@ -159,28 +237,43 @@ def auto_generate_slips(current_edges):
     for platform in ("UD", "PP"):
         platform_edges = [e for e in current_edges if e["platform"] == platform]
 
-        used_players_this_run     = set()
-        used_team_counts_this_run = {}
+        used_players_this_run        = set()
+        used_team_counts_this_run    = {}
+        used_matchup_counts_this_run = {}
 
-        committed_players     = set()
-        committed_team_counts = {}
+        committed_players        = set()
+        committed_team_counts    = {}
+        committed_matchup_counts = {}
+
+        def _slip_matchup_key(s):
+            """Derive matchup key from slip teams list (sorted unique pair)."""
+            teams = [t for t in (s.get("teams") or []) if t]
+            unique = sorted(set(teams))
+            return tuple(unique) if len(unique) == 2 else None
+
         for s in slips:
             if s["result"] is not None:
                 continue
             if s["platform"] != platform:
                 continue
+            mk = _slip_matchup_key(s)
             for i, player in enumerate(s["players"]):
                 committed_players.add(player.lower())
-                team = s.get("teams", [None] * len(s["players"]))[i]
-                if team:
-                    committed_team_counts[team] = committed_team_counts.get(team, 0) + 1
+                t = (s.get("teams") or [None] * len(s["players"]))[i]
+                if t:
+                    committed_team_counts[t] = committed_team_counts.get(t, 0) + 1
+            if mk:
+                committed_matchup_counts[mk] = committed_matchup_counts.get(mk, 0) + len(s["players"])
 
         for s in new_slips:
+            mk = _slip_matchup_key(s)
             for i, player in enumerate(s["players"]):
                 committed_players.add(player.lower())
-                team = s.get("teams", [None] * len(s["players"]))[i]
-                if team:
-                    committed_team_counts[team] = committed_team_counts.get(team, 0) + 1
+                t = (s.get("teams") or [None] * len(s["players"]))[i]
+                if t:
+                    committed_team_counts[t] = committed_team_counts.get(t, 0) + 1
+            if mk:
+                committed_matchup_counts[mk] = committed_matchup_counts.get(mk, 0) + len(s["players"])
 
         best_edge_per_player = {}
         for e in platform_edges:
@@ -191,12 +284,12 @@ def auto_generate_slips(current_edges):
 
         candidate_slips = []
 
-        for slip_type in ("2-pick", "3-pick"):
-            n = int(slip_type[0])
+        for slip_type in AUTOPILOT_SLIP_TYPES[platform]:
+            n = _n_picks(slip_type)
             if len(deduped_edges) < n:
                 continue
 
-            min_10 = MIN_PROB_10_PCT[platform][slip_type] * 100
+            min_10 = AUTOPILOT_MIN_AVG_PROB[platform][slip_type] * 100
 
             for combo in combinations(deduped_edges, n):
                 players     = [e["player"] for e in combo]
@@ -212,7 +305,7 @@ def auto_generate_slips(current_edges):
                 for team in teams:
                     if not team:
                         continue
-                    if committed_team_counts.get(team, 0) + teams.count(team) > 1:
+                    if committed_team_counts.get(team, 0) + teams.count(team) > MAX_PLAYERS_PER_TEAM_GLOBAL:
                         team_ok = False
                         break
                 if not team_ok:
@@ -231,30 +324,26 @@ def auto_generate_slips(current_edges):
                     else:
                         matchup_keys.append(None)
 
+                # Block any combo with 2+ players from the same matchup (even opposing teams)
                 same_matchup_players = {}
                 for idx_e, mk in enumerate(matchup_keys):
                     if mk is None:
                         continue
                     same_matchup_players.setdefault(mk, []).append(idx_e)
 
-                same_team_via_matchup = False
-                all_3_same_matchup = False
-                for mk, idxs in same_matchup_players.items():
-                    if len(idxs) >= 3:
-                        all_3_same_matchup = True
-                        break
-                    if len(idxs) < 2:
-                        continue
-                    game_teams = [combo[idx].get("team") for idx in idxs]
-                    non_null   = [t for t in game_teams if t]
-                    has_null   = any(t is None for t in game_teams)
-                    if len(non_null) != len(set(non_null)):
-                        same_team_via_matchup = True
-                        break
-                    if has_null:
-                        same_team_via_matchup = True
-                        break
-                if same_team_via_matchup or all_3_same_matchup:
+                if any(len(idxs) >= 2 for idxs in same_matchup_players.values()):
+                    continue
+
+                # Global matchup exposure check
+                combo_mk_counts = {}
+                for e in combo:
+                    h = e.get("home_abbr", "")
+                    a = e.get("away_abbr", "")
+                    if h and a:
+                        mk = tuple(sorted([h, a]))
+                        combo_mk_counts[mk] = combo_mk_counts.get(mk, 0) + 1
+                if any(committed_matchup_counts.get(mk, 0) + cnt > MAX_PLAYERS_PER_MATCHUP_GLOBAL
+                       for mk, cnt in combo_mk_counts.items()):
                     continue
 
                 combo_bets = [{
@@ -272,12 +361,10 @@ def auto_generate_slips(current_edges):
                 if avg_prob < min_10:
                     continue
 
-                ev_5, ev_pct_5, joint_prob = calc_ev(platform, slip_type, probs, 5.0)
-                stake = 5.0
-                ev = ev_5
-                ev_pct = ev_pct_5
+                stake              = stake_for_type(slip_type)
+                ev, ev_pct, joint_prob = calc_ev(platform, slip_type, probs, stake)
 
-                if ev_pct < 10:
+                if ev_pct < MIN_EV_PCT:
                     continue
 
                 key = f"{platform}:{','.join(sorted([e['player'].lower()+e['stat']+e['direction'] for e in combo]))}"
@@ -316,13 +403,23 @@ def auto_generate_slips(current_edges):
             for team in teams:
                 if not team:
                     continue
-                if used_team_counts_this_run.get(team, 0) + teams.count(team) > 1:
+                if used_team_counts_this_run.get(team, 0) + teams.count(team) > MAX_PLAYERS_PER_TEAM_GLOBAL:
                     team_ok = False
                     break
             if not team_ok:
                 continue
 
             combo = cand["combo"]
+            cand_mk_counts = {}
+            for e in combo:
+                h = e.get("home_abbr", "")
+                a = e.get("away_abbr", "")
+                if h and a:
+                    mk = tuple(sorted([h, a]))
+                    cand_mk_counts[mk] = cand_mk_counts.get(mk, 0) + 1
+            if any(used_matchup_counts_this_run.get(mk, 0) + cnt > MAX_PLAYERS_PER_MATCHUP_GLOBAL
+                   for mk, cnt in cand_mk_counts.items()):
+                continue
 
             all_ids = [s["id"] for s in slips] + [s["id"] for s in new_slips]
             next_id = max(all_ids) + 1 if all_ids else 1
@@ -334,6 +431,7 @@ def auto_generate_slips(current_edges):
                 "type":          cand["slip_type"],
                 "status":        "live",   # ← new: starts as live, promoted to active next cycle
                 "stake":         cand["stake"],
+                "stake_ratio":   STAKE_RATIO_BY_TYPE.get(cand["slip_type"], 2/3),
                 "bet_ids":       [],
                 "players":       cand["players"],
                 "teams":         teams,
@@ -357,9 +455,11 @@ def auto_generate_slips(current_edges):
 
             for p in player_keys:
                 used_players_this_run.add(p)
-            for team in teams:
-                if team:
-                    used_team_counts_this_run[team] = used_team_counts_this_run.get(team, 0) + 1
+            for t in teams:
+                if t:
+                    used_team_counts_this_run[t] = used_team_counts_this_run.get(t, 0) + 1
+            for mk, cnt in cand_mk_counts.items():
+                used_matchup_counts_this_run[mk] = used_matchup_counts_this_run.get(mk, 0) + cnt
 
             print(f"  [SLIP] Auto-generated: {platform} {cand['slip_type']} | "
                   f"JP: {cand['joint_prob']}% | EV: {cand['ev_pct']:+.1f}% "
@@ -449,13 +549,12 @@ def update_slips(all_bets):
 
         slip["current_probs"] = current_probs
 
-        if any(r == "miss" for r in results if r is not None):
+        if any(r == "miss" for r in results if r is not None) and not _is_flex(slip["type"]):
             ev         = round(-slip["stake"], 2)
             ev_pct     = -100.0
             joint_prob = 0.0
         else:
             effective_probs = []
-            effective_type  = slip["type"]
             voids = sum(1 for r in results if r == "void")
             for i, r in enumerate(results):
                 if r == "hit":
@@ -465,8 +564,13 @@ def update_slips(all_bets):
                 elif r is None:
                     effective_probs.append(current_probs[i])
 
-            if slip["type"] == "3-pick" and voids == 1:
-                effective_type = "2-pick"
+            # For power/standard slips, reduce type if legs are voided
+            n = _n_picks(slip["type"])
+            effective = n - voids
+            if not _is_flex(slip["type"]) and voids > 0 and effective >= 2:
+                effective_type = f"{effective}-pick"
+            else:
+                effective_type = slip["type"]
 
             if not effective_probs:
                 ev, ev_pct, joint_prob = 0.0, 0.0, 100.0
@@ -483,32 +587,37 @@ def update_slips(all_bets):
         if all_found and all(r is not None for r in results):
             hits      = sum(1 for r in results if r == "hit")
             voids     = sum(1 for r in results if r == "void")
-            effective = len(results) - voids
+            misses    = sum(1 for r in results if r == "miss")
+            n         = _n_picks(slip["type"])
+            effective = n - voids
 
-            if voids == len(results):
+            if voids == n:
                 final_result = "refund"
-            elif slip["type"] == "2-pick":
-                if voids >= 1:
-                    final_result = "refund"
-                elif hits == 2:
-                    final_result = "hit"
+            elif _is_flex(slip["type"]):
+                payouts  = _flex_payouts(slip["platform"], slip["type"])
+                min_hits = min(payouts.keys()) if payouts else n
+                final_result = f"hit-{hits}" if hits >= min_hits else "miss"
+            else:
+                # Power/Standard — any miss = loss; all-void = refund; voids reduce payout
+                if misses > 0:
+                    final_result = "miss"
+                elif hits == effective:
+                    final_result = "hit" if voids == 0 else f"hit-{effective}"
                 else:
                     final_result = "miss"
-            elif slip["type"] == "3-pick":
-                if voids >= 2:
-                    final_result = "refund"
-                elif voids == 1:
-                    final_result = "hit-2" if hits == effective else "miss"
-                else:
-                    final_result = "hit" if hits == 3 else "miss"
-            else:
-                final_result = "miss"
 
             payout, profit = _payout_for_result(slip, final_result)
             slip["result"]     = final_result
             slip["payout"]     = payout
             slip["profit"]     = profit
             slip["settled_at"] = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+            stake = float(slip.get("stake", 5.0))
+            if final_result == "miss":
+                slip["ev"]     = round(-stake, 2)
+                slip["ev_pct"] = -100.0
+            elif final_result in ("refund",):
+                slip["ev"]     = 0.0
+                slip["ev_pct"] = 0.0
             print(f"  [SLIP] Settled #{slip['id']}: {final_result.upper()} | "
                   f"Profit: ${profit:+.2f}")
 
@@ -573,13 +682,12 @@ def update_your_slips(all_bets):
 
         slip["current_probs"] = current_probs
 
-        if any(r == "miss" for r in results if r is not None):
+        if any(r == "miss" for r in results if r is not None) and not _is_flex(slip["type"]):
             ev         = round(-slip["stake"], 2)
             ev_pct     = -100.0
             joint_prob = 0.0
         else:
             effective_probs = []
-            effective_type  = slip["type"]
             voids = sum(1 for r in results if r == "void")
             for i, r in enumerate(results):
                 if r == "hit":
@@ -589,8 +697,13 @@ def update_your_slips(all_bets):
                 elif r is None:
                     effective_probs.append(current_probs[i])
 
-            if slip["type"] == "3-pick" and voids == 1:
-                effective_type = "2-pick"
+            # For power/standard slips, reduce type if legs are voided
+            n = _n_picks(slip["type"])
+            effective = n - voids
+            if not _is_flex(slip["type"]) and voids > 0 and effective >= 2:
+                effective_type = f"{effective}-pick"
+            else:
+                effective_type = slip["type"]
 
             if not effective_probs:
                 ev, ev_pct, joint_prob = 0.0, 0.0, 100.0
@@ -607,32 +720,37 @@ def update_your_slips(all_bets):
         if all_found and all(r is not None for r in results):
             hits      = sum(1 for r in results if r == "hit")
             voids     = sum(1 for r in results if r == "void")
-            effective = len(results) - voids
+            misses    = sum(1 for r in results if r == "miss")
+            n         = _n_picks(slip["type"])
+            effective = n - voids
 
-            if voids == len(results):
+            if voids == n:
                 final_result = "refund"
-            elif slip["type"] == "2-pick":
-                if voids >= 1:
-                    final_result = "refund"
-                elif hits == 2:
-                    final_result = "hit"
+            elif _is_flex(slip["type"]):
+                payouts  = _flex_payouts(slip["platform"], slip["type"])
+                min_hits = min(payouts.keys()) if payouts else n
+                final_result = f"hit-{hits}" if hits >= min_hits else "miss"
+            else:
+                # Power/Standard — any miss = loss; all-void = refund; voids reduce payout
+                if misses > 0:
+                    final_result = "miss"
+                elif hits == effective:
+                    final_result = "hit" if voids == 0 else f"hit-{effective}"
                 else:
                     final_result = "miss"
-            elif slip["type"] == "3-pick":
-                if voids >= 2:
-                    final_result = "refund"
-                elif voids == 1:
-                    final_result = "hit-2" if hits == effective else "miss"
-                else:
-                    final_result = "hit" if hits == 3 else "miss"
-            else:
-                final_result = "miss"
 
             payout, profit = _payout_for_result(slip, final_result)
             slip["result"]     = final_result
             slip["payout"]     = payout
             slip["profit"]     = profit
             slip["settled_at"] = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+            stake = float(slip.get("stake", 5.0))
+            if final_result == "miss":
+                slip["ev"]     = round(-stake, 2)
+                slip["ev_pct"] = -100.0
+            elif final_result in ("refund",):
+                slip["ev"]     = 0.0
+                slip["ev_pct"] = 0.0
             print(f"  [YOUR SLIP] Settled #{slip['id']}: {final_result.upper()} | "
                   f"Profit: ${profit:+.2f}")
 
@@ -741,14 +859,23 @@ def update_your_slips_from_edges(current_edges, sb_props=None):
         if slip["result"] is not None:
             continue
 
-        new_probs = list(slip["current_probs"])
+        new_probs   = list(slip["current_probs"])
+        leg_results = slip.get("leg_results") or [None] * len(slip["players"])
         for i, player in enumerate(slip["players"]):
             detail    = slip["details"][i]
             parts     = detail.split()
             direction = parts[0]
             stat_str  = parts[-1]
 
-            key = (player.lower(), slip["platform"], stat_str, direction)
+            # Skip legs already settled
+            if i < len(leg_results) and leg_results[i] is not None:
+                continue
+
+            # Normalize UI label (PTS→points) to match edge_lookup keys
+            stat_key = STAT_NORMALIZE.get(stat_str)
+            normalized_stat = stat_key.upper() if stat_key else stat_str
+
+            key = (player.lower(), slip["platform"], normalized_stat, direction)
             if key in edge_lookup:
                 new_probs[i] = edge_lookup[key]
                 continue
@@ -756,7 +883,6 @@ def update_your_slips_from_edges(current_edges, sb_props=None):
             if sb_props is None:
                 continue
 
-            stat_key = STAT_NORMALIZE.get(stat_str)
             if not stat_key:
                 continue
 
@@ -790,9 +916,33 @@ def update_your_slips_from_edges(current_edges, sb_props=None):
             )
 
         slip["current_probs"] = new_probs
-        ev, ev_pct, joint_prob = calc_ev(
-            slip["platform"], slip["type"], new_probs, slip["stake"]
-        )
+
+        # EV calculation mirrors autopilot: treat hit legs as 100%, skip voids
+        if any(r == "miss" for r in leg_results if r is not None) and not _is_flex(slip["type"]):
+            ev, ev_pct, joint_prob = round(-slip["stake"], 2), -100.0, 0.0
+        else:
+            effective_probs = []
+            voids = sum(1 for r in leg_results if r == "void")
+            for i, r in enumerate(leg_results):
+                if r == "hit":
+                    effective_probs.append(100.0)
+                elif r == "void":
+                    continue
+                else:
+                    effective_probs.append(new_probs[i])
+            n = _n_picks(slip["type"])
+            effective = n - voids
+            if not _is_flex(slip["type"]) and voids > 0 and effective >= 2:
+                effective_type = f"{effective}-pick"
+            else:
+                effective_type = slip["type"]
+            if not effective_probs:
+                ev, ev_pct, joint_prob = 0.0, 0.0, 100.0
+            else:
+                ev, ev_pct, joint_prob = calc_ev(
+                    slip["platform"], effective_type, effective_probs, slip["stake"]
+                )
+
         slip["joint_prob"] = joint_prob
         slip["ev"]         = ev
         slip["ev_pct"]     = ev_pct
@@ -828,7 +978,7 @@ def print_slips():
 
 # ── Manual slip creation (Your Bets) ─────────────────────────────────────────
 
-def create_your_slip(platform, bet_ids, stake=STAKE):
+def create_your_slip(platform, bet_ids, stake=STAKE, slip_type=None):
     from bet_tracker import load_bets
     all_bets = load_bets()
     bet_map  = {b["id"]: b for b in all_bets}
@@ -845,12 +995,13 @@ def create_your_slip(platform, bet_ids, stake=STAKE):
         selected.append(b)
 
     n = len(bet_ids)
-    if n == 2:
-        slip_type = "2-pick"
-    elif n == 3:
-        slip_type = "3-pick"
-    else:
-        return None, "Invalid number of picks. Use 2 or 3."
+    if slip_type is None:
+        # Default: power for PP, standard for UD
+        slip_type = f"{n}-pick"
+    if n < 2 or n > 6:
+        return None, "Invalid number of picks. Use 2–6."
+    if _is_flex(slip_type) and _n_picks(slip_type) != n:
+        return None, f"Slip type {slip_type} doesn't match {n} bet IDs."
 
     is_valid, reason = check_correlation(selected)
     if not is_valid:

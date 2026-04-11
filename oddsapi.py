@@ -5,18 +5,30 @@ from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 load_dotenv()
 
-# Two separate accounts — each scoped to one bookmaker
-API_KEY_FANDUEL = os.environ["ODDSAPI_KEY_FANDUEL"]
-API_KEY_BETMGM  = os.environ["ODDSAPI_KEY_BETMGM"]
-BASE            = "https://api.odds-api.io/v3"
+# Four separate accounts — each scoped to one bookmaker
+API_KEY_FANDUEL    = os.environ["ODDSAPI_KEY_FANDUEL"]
+API_KEY_BETMGM     = os.environ["ODDSAPI_KEY_BETMGM"]
+API_KEY_DRAFTKINGS = os.environ["ODDSAPI_KEY_DRAFTKINGS"]
+API_KEY_CAESARS    = os.environ["ODDSAPI_KEY_CAESARS"]
+BASE               = "https://api.odds-api.io/v3"
 
 # ── Rate limit tracking ───────────────────────────────────────────────────────
-# 100 requests/hour per account (two accounts = 200 total)
-# We fetch events (1 req) + one per game per account (~10 games x 2 = 20 req) per cycle
-# At 6 cycles/hour = ~126 req/hour total, ~63 per account — safely under limit.
+# 100 requests/hour per account (three accounts = 300 total)
 _rate_limit_fd  = {"remaining": 100, "reset_at": None}
 _rate_limit_mgm = {"remaining": 100, "reset_at": None}
-_last_updated_at = None   # tracks freshness of data
+_rate_limit_dk  = {"remaining": 100, "reset_at": None}
+_rate_limit_cae = {"remaining": 100, "reset_at": None}
+_last_updated_at = None   # combined freshness (oldest of all books)
+
+# Per-book freshness timestamps
+_book_updated_at = {
+    "fanduel":    None,
+    "betmgm":     None,
+    "draftkings": None,
+    "caesars":    None,
+}
+
+STALE_THRESHOLD_SECS = 300  # 5 minutes
 
 # ── Team name → ESPN abbreviation ─────────────────────────────────────────────
 # odds-api.io returns full team names e.g. "Indiana Pacers"
@@ -92,8 +104,10 @@ SKIP_STAT_LABELS = {
 }
 
 BOOK_MAP = {
-    "fanduel": "fanduel",
-    "betmgm":  "betmgm",
+    "fanduel":    "fanduel",
+    "betmgm":     "betmgm",
+    "draftkings": "draftkings",
+    "caesars":    "caesars",
 }
 
 
@@ -206,6 +220,24 @@ def _fetch_event_odds_mgm(event_id: int) -> dict | None:
     }, _rate_limit_mgm)
 
 
+def _fetch_event_odds_dk(event_id: int) -> dict | None:
+    """Fetch DraftKings odds for a single event."""
+    return _safe_get(f"{BASE}/odds", {
+        "apiKey":     API_KEY_DRAFTKINGS,
+        "eventId":    event_id,
+        "bookmakers": "DraftKings",
+    }, _rate_limit_dk)
+
+
+def _fetch_event_odds_cae(event_id: int) -> dict | None:
+    """Fetch Caesars odds for a single event."""
+    return _safe_get(f"{BASE}/odds", {
+        "apiKey":     API_KEY_CAESARS,
+        "eventId":    event_id,
+        "bookmakers": "Caesars",
+    }, _rate_limit_cae)
+
+
 # ── Build anchors and props ───────────────────────────────────────────────────
 
 def _build_anchor(event: dict, odds_data: dict) -> dict:
@@ -246,7 +278,7 @@ def _build_anchor(event: dict, odds_data: dict) -> dict:
 def _parse_props_from_odds(odds_data: dict, anchor: dict) -> list[dict]:
     """
     Parse player props from a single event's odds response.
-    Returns list of prop dicts matching the format main.py expects.
+    Returns (list of prop dicts, per-book timestamps dict).
     """
     props       = []
     bookmakers  = odds_data.get("bookmakers", {})
@@ -255,8 +287,9 @@ def _parse_props_from_odds(odds_data: dict, anchor: dict) -> list[dict]:
     # Structure: { (player, stat): { "fanduel": {...}, "betmgm": {...} } }
     collected: dict[tuple, dict] = {}
 
-    # Track latest updatedAt across all prop markets for freshness reporting
+    # Track latest updatedAt per book and overall
     latest_updated = None
+    book_timestamps: dict[str, datetime] = {}
 
     for book_name, markets in bookmakers.items():
         our_book = BOOK_MAP.get(book_name.lower())
@@ -267,13 +300,15 @@ def _parse_props_from_odds(odds_data: dict, anchor: dict) -> list[dict]:
             if "Player Props" not in market.get("name", ""):
                 continue
 
-            # Track freshness
+            # Track freshness per book and overall
             updated_str = market.get("updatedAt", "")
             if updated_str:
                 try:
                     ts = datetime.fromisoformat(updated_str.replace("Z", "+00:00"))
                     if latest_updated is None or ts > latest_updated:
                         latest_updated = ts
+                    if our_book not in book_timestamps or ts > book_timestamps[our_book]:
+                        book_timestamps[our_book] = ts
                 except Exception:
                     pass
 
@@ -362,7 +397,7 @@ def _parse_props_from_odds(odds_data: dict, anchor: dict) -> list[dict]:
             "player_team":   "",  # not available from this API
         })
 
-    return props, latest_updated
+    return props, latest_updated, book_timestamps
 
 
 # ── Public interface ──────────────────────────────────────────────────────────
@@ -409,7 +444,7 @@ def get_oddsapi_props(wait_for_refresh=False) -> list[dict]:
         return []
 
     print(f"  [OddsAPI] Fetching props for {len(upcoming)} game(s) "
-          f"(FD: {_rate_limit_fd['remaining']} req | MGM: {_rate_limit_mgm['remaining']} req remaining)")
+          f"(FD: {_rate_limit_fd['remaining']} req | MGM: {_rate_limit_mgm['remaining']} req | DK: {_rate_limit_dk['remaining']} req | CAE: {_rate_limit_cae['remaining']} req remaining)")
 
     # Step 2: fetch odds per game
     all_props     = []
@@ -423,41 +458,101 @@ def get_oddsapi_props(wait_for_refresh=False) -> list[dict]:
         fd_data = _fetch_event_odds_fd(event["id"])
         if fd_data:
             anchor = _build_anchor(event, fd_data)
-            fd_props, ts = _parse_props_from_odds(fd_data, anchor)
+            fd_props, ts, bts = _parse_props_from_odds(fd_data, anchor)
             all_props.extend(fd_props)
             if ts and (latest_ts is None or ts > latest_ts):
                 latest_ts = ts
+            for bk, bts_val in bts.items():
+                if _book_updated_at[bk] is None or bts_val > _book_updated_at[bk]:
+                    _book_updated_at[bk] = bts_val
 
         # BetMGM fetch
         mgm_data = _fetch_event_odds_mgm(event["id"])
         if mgm_data:
             if anchor is None:
                 anchor = _build_anchor(event, mgm_data)
-            mgm_props, ts = _parse_props_from_odds(mgm_data, anchor)
+            mgm_props, ts, bts = _parse_props_from_odds(mgm_data, anchor)
             all_props.extend(mgm_props)
             if ts and (latest_ts is None or ts > latest_ts):
                 latest_ts = ts
+            for bk, bts_val in bts.items():
+                if _book_updated_at[bk] is None or bts_val > _book_updated_at[bk]:
+                    _book_updated_at[bk] = bts_val
 
-        if fd_data or mgm_data:
+        # DraftKings fetch
+        dk_data = _fetch_event_odds_dk(event["id"])
+        if dk_data:
+            if anchor is None:
+                anchor = _build_anchor(event, dk_data)
+            dk_props, ts, bts = _parse_props_from_odds(dk_data, anchor)
+            all_props.extend(dk_props)
+            if ts and (latest_ts is None or ts > latest_ts):
+                latest_ts = ts
+            for bk, bts_val in bts.items():
+                if _book_updated_at[bk] is None or bts_val > _book_updated_at[bk]:
+                    _book_updated_at[bk] = bts_val
+
+        # Caesars fetch
+        cae_data = _fetch_event_odds_cae(event["id"])
+        if cae_data:
+            if anchor is None:
+                anchor = _build_anchor(event, cae_data)
+            cae_props, ts, bts = _parse_props_from_odds(cae_data, anchor)
+            all_props.extend(cae_props)
+            if ts and (latest_ts is None or ts > latest_ts):
+                latest_ts = ts
+            for bk, bts_val in bts.items():
+                if _book_updated_at[bk] is None or bts_val > _book_updated_at[bk]:
+                    _book_updated_at[bk] = bts_val
+
+        if fd_data or mgm_data or dk_data or cae_data:
             games_fetched += 1
 
     # Report data freshness
+    now_utc = datetime.now(timezone.utc)
     if latest_ts:
         _last_updated_at = latest_ts
-        age_secs = (datetime.now(timezone.utc) - latest_ts).total_seconds()
-        print(f"  [OddsAPI] Data age: {int(age_secs)}s | "
-              f"FD: {_rate_limit_fd['remaining']} req left | "
-              f"MGM: {_rate_limit_mgm['remaining']} req left")
+        age_secs = (now_utc - latest_ts).total_seconds()
+        # Per-book age strings
+        book_age_parts = []
+        book_short = {"fanduel": "FD", "betmgm": "MGM", "draftkings": "DK", "caesars": "CAE"}
+        for bk in ("fanduel", "betmgm", "draftkings", "caesars"):
+            ts = _book_updated_at.get(bk)
+            label = book_short[bk]
+            if ts:
+                age = int((now_utc - ts).total_seconds())
+                stale = " ⚠STALE" if age > STALE_THRESHOLD_SECS else ""
+                book_age_parts.append(f"{label}:{age}s{stale}")
+            else:
+                book_age_parts.append(f"{label}:N/A")
+        print(f"  [OddsAPI] Data age: {int(age_secs)}s | {' | '.join(book_age_parts)} | "
+              f"FD: {_rate_limit_fd['remaining']} req | "
+              f"MGM: {_rate_limit_mgm['remaining']} req | "
+              f"DK: {_rate_limit_dk['remaining']} req | "
+              f"CAE: {_rate_limit_cae['remaining']} req left")
     else:
         print(f"  [OddsAPI] FD: {_rate_limit_fd['remaining']} req left | "
-              f"MGM: {_rate_limit_mgm['remaining']} req left")
+              f"MGM: {_rate_limit_mgm['remaining']} req left | "
+              f"DK: {_rate_limit_dk['remaining']} req left")
 
     # Schedule next refresh
     _next_refresh_at = datetime.now(timezone.utc) + timedelta(seconds=_REFRESH_INTERVAL)
 
     print(f"  [OddsAPI] Fetched {len(all_props)} props across "
-          f"{games_fetched} game(s) (FD + MGM)")
+          f"{games_fetched} game(s) (FD + MGM + DK + CAE)")
     return all_props
+
+
+def get_stale_books() -> set[str]:
+    """Return set of book names whose data is older than STALE_THRESHOLD_SECS."""
+    now_utc = datetime.now(timezone.utc)
+    stale = set()
+    for bk, ts in _book_updated_at.items():
+        if ts is None:
+            continue
+        if (now_utc - ts).total_seconds() > STALE_THRESHOLD_SECS:
+            stale.add(bk)
+    return stale
 
 
 def build_game_anchors(data=None) -> dict:
