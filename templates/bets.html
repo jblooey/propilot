@@ -499,8 +499,82 @@ body {
 .spin { width: 14px; height: 14px; border: 2px solid var(--border-2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Splash screen ── */
-#splash {
+/* ══════════════════════════════════════════════
+   MOBILE RESPONSIVE  (max-width: 768px)
+   ══════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* ── Body: allow full-page scroll on mobile ── */
+  body { height: auto; overflow-y: auto; overflow-x: hidden; }
+
+  /* ── Topbar ── */
+  .topbar { padding: 0 12px; }
+  .topbar-ts { display: none; }
+  .topbar-right { gap: 8px; }
+  .logo-text { font-size: 14px; }
+  .nav-links { gap: 12px; }
+  .nav-link { font-size: 11px; }
+
+  /* ── Unit bar: wrap on small screens ── */
+  .unit-bar { flex-wrap: wrap; padding: 6px 12px; gap: 6px 12px; }
+
+  /* ── Stats row: horizontal scroll ── */
+  .stats-row {
+    display: flex;
+    overflow-x: auto;
+    grid-template-columns: none;
+    padding: 8px 12px 0;
+    gap: 8px;
+    flex-shrink: 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .stats-row::-webkit-scrollbar { display: none; }
+  .stat-card {
+    min-width: 130px;
+    flex-shrink: 0;
+    padding: 10px 12px;
+  }
+  .sc-value { font-size: 22px; }
+
+  /* ── Main layout: stack vertically ── */
+  .main-layout {
+    flex-direction: column;
+    overflow: visible;
+    padding: 8px 12px 20px;
+    min-height: auto;
+    gap: 10px;
+  }
+
+  /* ── Slips panel: reasonable height ── */
+  .slips-panel { min-height: 380px; max-height: 70vh; }
+
+  /* ── Panel toolbar: allow wrapping ── */
+  .panel-toolbar {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    gap: 6px;
+  }
+  .panel-tabs { height: auto; flex-wrap: wrap; gap: 4px; }
+  .ptab { margin-right: 10px; padding: 4px 0; }
+
+  /* ── Stats sidebar: full width below slips ── */
+  .stats-sidebar {
+    width: 100%;
+    overflow-y: visible;
+    align-self: auto;
+    min-height: auto;
+  }
+
+  /* ── Slip card legs: allow name to wrap slightly ── */
+  .leg-name { font-size: 11px; }
+  .leg-prob-val { font-size: 14px; }
+
+  /* ── Filter bar ── */
+  .filter-bar { padding: 6px 12px; }
+}
+
   position: fixed; inset: 0; z-index: 9999;
   background: #0a0a0c;
   display: flex; align-items: center; justify-content: center;
