@@ -179,7 +179,25 @@ def _enrich_slip(s, bet_lookup):
             print(f"  [ENRICH] ⚠ No bet match for {player} {stat_key} {direction} {line}")
         leg_results.append(result)
 
-    return {**s, "leg_results": leg_results}
+    # Build per-leg opponent team from individual bet data
+    bets_full = load_bets()
+    bet_full_map = {b["id"]: b for b in bets_full}
+    bet_ids = s.get("bet_ids", [])
+    player_teams = s.get("teams", [])
+    opponent_teams = []
+    for i in range(len(s["players"])):
+        opp = None
+        if i < len(bet_ids) and bet_ids[i] is not None:
+            b = bet_full_map.get(bet_ids[i])
+            if b:
+                pt = (player_teams[i] if i < len(player_teams) else None) or ''
+                home = b.get("home_abbr", "")
+                away = b.get("away_abbr", "")
+                if pt and home and away:
+                    opp = away if pt == home else home
+        opponent_teams.append(opp)
+
+    return {**s, "leg_results": leg_results, "opponent_teams": opponent_teams}
 
 
 # ── Auth routes ───────────────────────────────────────────────────────────────

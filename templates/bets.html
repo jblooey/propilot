@@ -291,12 +291,9 @@ body {
 
 /* ── Slips grid ── */
 .slips-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 10px;
-  align-items: start;
+  display: flex; flex-direction: column; gap: 10px;
 }
-.day-group { grid-column: 1 / -1; }
+.day-group {}
 .day-header {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 0 6px;
@@ -308,7 +305,7 @@ body {
 .dh-pnl.pos { color: var(--green); }
 .dh-pnl.neg { color: var(--red); }
 .dh-pnl.neu { color: var(--text-4); }
-.day-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+.day-cards { display: flex; flex-direction: column; gap: 8px; }
 
 /* ── PrizePicks-style slip card ── */
 .psc-card {
@@ -359,44 +356,43 @@ body {
 .psc-ev.neu { color: var(--text-3); }
 .psc-stake { font-size: 11px; font-weight: 500; color: var(--text-4); font-family: 'JetBrains Mono', monospace; }
 
-/* Individual leg */
+/* Individual leg — horizontal row */
 .psc-leg {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 14px;
+  display: flex; align-items: center;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
-  gap: 12px;
+  gap: 14px;
 }
 .psc-leg:last-child { border-bottom: none; }
 .psc-leg.hit  { background: rgba(34,197,94,0.03); }
 .psc-leg.miss { background: rgba(239,68,68,0.03); }
-.psc-leg-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
 
-/* Avatar */
+/* Team color avatar */
 .psc-avatar {
-  width: 44px; height: 44px; border-radius: 10px;
+  width: 46px; height: 46px; border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 14px; font-weight: 700; flex-shrink: 0;
-  font-family: 'JetBrains Mono', monospace; letter-spacing: -0.05em;
+  font-size: 11px; font-weight: 800; flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace; letter-spacing: 0;
+  border: 1px solid rgba(255,255,255,0.10);
+  position: relative; overflow: hidden;
 }
-.psc-avatar.pp { background: rgba(124,58,237,0.15); color: #a78bfa; border: 1px solid rgba(124,58,237,0.30); }
-.psc-avatar.ud { background: rgba(217,119,6,0.15);  color: #fbbf24; border: 1px solid rgba(217,119,6,0.30); }
-.psc-avatar.hit  { background: var(--green-dim); color: var(--green); border-color: var(--green-border); }
-.psc-avatar.miss { background: var(--red-dim);   color: var(--red);   border-color: var(--red-border); }
+.psc-avatar.result-hit  { box-shadow: 0 0 0 2px var(--green); }
+.psc-avatar.result-miss { box-shadow: 0 0 0 2px var(--red); }
 
-/* Leg info */
+/* Leg info — takes up remaining space */
 .psc-leg-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .psc-player { font-size: 14px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .psc-player.hit  { color: var(--green); }
 .psc-player.miss { color: var(--red); opacity: 0.8; }
 .psc-player.void { color: var(--text-4); }
-.psc-meta { display: flex; align-items: center; gap: 5px; }
+.psc-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .psc-league {
   font-size: 9px; font-weight: 700; letter-spacing: 0.07em;
   color: var(--text-4); border: 1px solid var(--border-2);
   padding: 1px 4px; border-radius: 3px; font-family: 'JetBrains Mono', monospace;
 }
 .psc-team { font-size: 11px; color: var(--text-3); }
-.psc-team strong { color: var(--text-2); font-weight: 600; }
+.psc-team strong { color: var(--text-2); font-weight: 700; }
 .psc-line { font-size: 13px; font-weight: 500; color: var(--text-2); }
 .psc-prob { font-size: 11px; font-family: 'JetBrains Mono', monospace; }
 .psc-delta { font-size: 10px; font-weight: 600; }
@@ -407,36 +403,23 @@ body {
 /* More / Less buttons */
 .psc-leg-right { display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
 .psc-btn {
-  width: 72px; padding: 7px 0; text-align: center;
+  width: 74px; padding: 7px 0; text-align: center;
   font-size: 12px; font-weight: 600;
   border-radius: var(--r);
   border: 1px solid var(--border-2);
   background: var(--surface-2);
   color: var(--text-4);
   cursor: default;
-  transition: all 150ms ease;
   font-family: 'Inter', sans-serif;
 }
 .psc-btn.selected {
-  background: rgba(34,197,94,0.12);
+  background: rgba(34,197,94,0.14);
   border-color: var(--green-border);
   color: var(--green);
 }
-.psc-btn.selected.hit {
-  background: var(--green-dim);
-  border-color: var(--green-border);
-  color: var(--green);
-}
-.psc-btn.selected.miss {
-  background: var(--red-dim);
-  border-color: var(--red-border);
-  color: var(--red);
-}
-.psc-btn.selected.void {
-  background: rgba(113,113,122,0.12);
-  border-color: rgba(113,113,122,0.30);
-  color: #71717a;
-}
+.psc-btn.selected.hit  { background: var(--green-dim); border-color: var(--green-border); color: var(--green); }
+.psc-btn.selected.miss { background: var(--red-dim);   border-color: var(--red-border);   color: var(--red); }
+.psc-btn.selected.void { background: rgba(113,113,122,0.12); border-color: rgba(113,113,122,0.30); color: #71717a; }
 
 /* Expanded detail */
 .psc-detail {
@@ -528,10 +511,9 @@ body {
   .stat-card { min-width: 130px; flex-shrink: 0; }
 
   .slips-section { padding: 10px 14px 20px; }
-  .slips-grid { grid-template-columns: 1fr; }
-  .day-cards  { grid-template-columns: 1fr; }
   .psc-btn { width: 60px; font-size: 11px; }
   .psc-player { font-size: 13px; }
+  .psc-avatar { width: 38px; height: 38px; font-size: 10px; }
 }
 </style>
 </head>
@@ -1031,7 +1013,7 @@ function renderSlips() {
     }
     el.innerHTML = html;
   } else {
-    el.innerHTML = `<div class="day-cards" style="grid-column:1/-1">${list.map(s => renderSlipCard(s)).join('')}</div>`;
+    el.innerHTML = list.map(s => renderSlipCard(s)).join('');
   }
 }
 
@@ -1042,6 +1024,40 @@ function formatDayLabel(dateStr) {
   if (d.toDateString() === today.toDateString()) return 'Today';
   if (d.toDateString() === yest.toDateString())  return 'Yesterday';
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+// ── NBA team colors ────────────────────────────────────────────────────────
+const NBA_COLORS = {
+  ATL:{bg:'#C1D32F',fg:'#000'}, BOS:{bg:'#007A33',fg:'#fff'}, BKN:{bg:'#1D1D1D',fg:'#fff'},
+  CHA:{bg:'#1D1160',fg:'#00788C'}, CHI:{bg:'#CE1141',fg:'#fff'}, CLE:{bg:'#6F263D',fg:'#FFB81C'},
+  DAL:{bg:'#00538C',fg:'#fff'}, DEN:{bg:'#0E2240',fg:'#FEC524'}, DET:{bg:'#C8102E',fg:'#1D42BA'},
+  GSW:{bg:'#1D428A',fg:'#FFC72C'}, HOU:{bg:'#CE1141',fg:'#fff'}, IND:{bg:'#002D62',fg:'#FDBB30'},
+  LAC:{bg:'#C8102E',fg:'#1D428A'}, LAL:{bg:'#552583',fg:'#FDB927'}, MEM:{bg:'#5D76A9',fg:'#12173F'},
+  MIA:{bg:'#98002E',fg:'#F9A01B'}, MIL:{bg:'#00471B',fg:'#EEE1C6'}, MIN:{bg:'#0C2340',fg:'#78BE20'},
+  NOP:{bg:'#0C2340',fg:'#C8102E'}, NO:{bg:'#0C2340',fg:'#C8102E'},
+  NYK:{bg:'#006BB6',fg:'#F58426'}, NY:{bg:'#006BB6',fg:'#F58426'},
+  OKC:{bg:'#007AC1',fg:'#EF3B24'}, ORL:{bg:'#0077C0',fg:'#C4CED4'},
+  PHI:{bg:'#006BB6',fg:'#ED174C'}, PHX:{bg:'#1D1160',fg:'#E56020'},
+  POR:{bg:'#E03A3E',fg:'#fff'}, SAC:{bg:'#5A2D81',fg:'#63727A'},
+  SAS:{bg:'#C4CED4',fg:'#000'}, TOR:{bg:'#CE1141',fg:'#000'},
+  UTA:{bg:'#002B5C',fg:'#00471B'}, WAS:{bg:'#002B5C',fg:'#E31837'},
+};
+
+function teamAvatar(abbr, lrClass, platformClass) {
+  const c = NBA_COLORS[abbr] || (platformClass === 'pp'
+    ? {bg:'rgba(124,58,237,0.20)', fg:'#a78bfa'}
+    : {bg:'rgba(217,119,6,0.20)',  fg:'#fbbf24'});
+  const resultCls = lrClass ? ` result-${lrClass}` : '';
+  return `<div class="psc-avatar${resultCls}" style="background:${c.bg};color:${c.fg};">${abbr || '?'}</div>`;
+}
+
+function formatType(type) {
+  // "3-pick" → "3-Pick Power"  "3-pick-flex" → "3-Pick Flex"
+  if (!type) return '';
+  const flex = type.includes('flex');
+  const base = type.replace('-flex','').replace('-pick',' Pick');
+  const cap  = base.charAt(0).toUpperCase() + base.slice(1);
+  return `${cap} ${flex ? 'Flex' : 'Power'}`;
 }
 
 // ── Render single slip card (PrizePicks style) ─────────────────────────────
@@ -1076,58 +1092,46 @@ function renderSlipCard(s) {
 
   // Legs
   const legsHtml = s.players.map((player, i) => {
-    const detail = s.details[i] || '';
-    const team   = (s.teams || [])[i] || '';
-    const prob   = s.current_probs ? s.current_probs[i] : s.added_probs[i];
-    const added  = s.added_probs[i];
-    const diff   = parseFloat((prob - added).toFixed(1));
-    const dc     = diff > 0 ? 'up' : diff < 0 ? 'dn' : 'fl';
-    const ds     = diff > 0 ? `\u2191${diff}%` : diff < 0 ? `\u2193${Math.abs(diff)}%` : '\u2192';
-    const lr     = s.leg_results ? s.leg_results[i] : null;
+    const detail  = s.details[i] || '';
+    const team    = (s.teams || [])[i] || '';
+    const opp     = (s.opponent_teams || [])[i] || '';
+    const prob    = s.current_probs ? s.current_probs[i] : s.added_probs[i];
+    const added   = s.added_probs[i];
+    const diff    = parseFloat((prob - added).toFixed(1));
+    const dc      = diff > 0 ? 'up' : diff < 0 ? 'dn' : 'fl';
+    const ds      = diff > 0 ? `\u2191${diff}%` : diff < 0 ? `\u2193${Math.abs(diff)}%` : '\u2192';
+    const lr      = s.leg_results ? s.leg_results[i] : null;
     const lrClass = lr === 'hit' ? 'hit' : lr === 'miss' ? 'miss' : lr === 'void' ? 'void' : '';
 
-    // Parse direction, line, stat from detail: "OVER 14.5 POINTS"
-    const parts   = detail.split(' ');
-    const dir     = parts[0] || 'OVER'; // OVER or UNDER
-    const lineVal = parts[1] || '';
+    const parts    = detail.split(' ');
+    const dir      = parts[0] || 'OVER';
+    const lineVal  = parts[1] || '';
     const statName = parts.slice(2).join(' ') || '';
-    const isOver  = dir === 'OVER';
+    const isOver   = dir === 'OVER';
 
-    // Button states
     let moreCls = 'psc-btn more';
     let lessCls = 'psc-btn less';
-    if (lr === 'hit') {
-      if (isOver) moreCls += ' selected hit'; else lessCls += ' selected hit';
-    } else if (lr === 'miss') {
-      if (isOver) moreCls += ' selected miss'; else lessCls += ' selected miss';
-    } else if (lr === 'void') {
-      if (isOver) moreCls += ' selected void'; else lessCls += ' selected void';
-    } else {
-      // Active/live: highlight chosen direction in green
-      if (isOver) moreCls += ' selected'; else lessCls += ' selected';
-    }
+    if (lr === 'hit')       { if (isOver) moreCls += ' selected hit';  else lessCls += ' selected hit'; }
+    else if (lr === 'miss') { if (isOver) moreCls += ' selected miss'; else lessCls += ' selected miss'; }
+    else if (lr === 'void') { if (isOver) moreCls += ' selected void'; else lessCls += ' selected void'; }
+    else                    { if (isOver) moreCls += ' selected';      else lessCls += ' selected'; }
 
-    // Initials avatar
-    const nameParts = player.trim().split(/\s+/);
-    const initials  = nameParts.length >= 2
-      ? (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
-      : player.slice(0, 2).toUpperCase();
+    const playerSym = lr === 'hit' ? ' \u2713' : lr === 'miss' ? ' \u2717' : lr === 'void' ? ' \u2205' : '';
 
-    const avatarClass = lr ? `psc-avatar ${lr}` : `psc-avatar ${platformClass}`;
-    const playerNameSym = lr === 'hit' ? ` \u2713` : lr === 'miss' ? ` \u2717` : lr === 'void' ? ` \u2205` : '';
+    const teamLine = team
+      ? `<span class="psc-team"><strong>${team}</strong>${opp ? ` vs ${opp}` : ''}</span>`
+      : '';
 
     return `<div class="psc-leg ${lrClass}">
-      <div class="psc-leg-left">
-        <div class="${avatarClass}">${initials}</div>
-        <div class="psc-leg-info">
-          <div class="psc-player ${lrClass}">${player}${playerNameSym}</div>
-          <div class="psc-meta">
-            <span class="psc-league">NBA</span>
-            ${team ? `<span class="psc-team"><strong>${team}</strong></span>` : ''}
-          </div>
-          <div class="psc-line">${lineVal} ${statName}</div>
-          <div class="psc-prob ${probClass(prob, s.platform)}">${prob}% <span class="psc-delta ${dc}">${ds}</span></div>
+      ${teamAvatar(team, lrClass, platformClass)}
+      <div class="psc-leg-info">
+        <div class="psc-player ${lrClass}">${player}${playerSym}</div>
+        <div class="psc-meta">
+          <span class="psc-league">NBA</span>
+          ${teamLine}
         </div>
+        <div class="psc-line">${lineVal} ${statName}</div>
+        <div class="psc-prob ${probClass(prob, s.platform)}">${prob}% <span class="psc-delta ${dc}">${ds}</span></div>
       </div>
       <div class="psc-leg-right">
         <button class="${moreCls}">More</button>
@@ -1163,7 +1167,7 @@ function renderSlipCard(s) {
     <div class="psc-header">
       <div class="psc-header-left">
         <span class="ptag ${platformClass}">${s.platform}</span>
-        <span class="psc-type">${s.type}</span>
+        <span class="psc-type">${formatType(s.type)}</span>
         ${liveBadge}
       </div>
       <div class="psc-header-right">
