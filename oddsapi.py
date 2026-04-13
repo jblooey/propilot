@@ -5,19 +5,30 @@ from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 load_dotenv()
 
-# Four separate accounts — each scoped to one bookmaker
+# Four separate accounts — each scoped to one bookmaker (NBA)
 API_KEY_FANDUEL    = os.environ["ODDSAPI_KEY_FANDUEL"]
 API_KEY_BETMGM     = os.environ["ODDSAPI_KEY_BETMGM"]
 API_KEY_DRAFTKINGS = os.environ["ODDSAPI_KEY_DRAFTKINGS"]
 API_KEY_CAESARS    = os.environ["ODDSAPI_KEY_CAESARS"]
+# Four separate MLB accounts
+API_KEY_FANDUEL_MLB    = os.environ.get("ODDSAPI_KEY_FANDUEL_MLB",    "")
+API_KEY_BETMGM_MLB     = os.environ.get("ODDSAPI_KEY_BETMGM_MLB",     "")
+API_KEY_DRAFTKINGS_MLB = os.environ.get("ODDSAPI_KEY_DRAFTKINGS_MLB", "")
+API_KEY_CAESARS_MLB    = os.environ.get("ODDSAPI_KEY_CAESARS_MLB",    "")
 BASE               = "https://api.odds-api.io/v3"
 
 # ── Rate limit tracking ───────────────────────────────────────────────────────
-# 100 requests/hour per account (three accounts = 300 total)
+# 100 requests/hour per account
 _rate_limit_fd  = {"remaining": 100, "reset_at": None}
 _rate_limit_mgm = {"remaining": 100, "reset_at": None}
 _rate_limit_dk  = {"remaining": 100, "reset_at": None}
 _rate_limit_cae = {"remaining": 100, "reset_at": None}
+# MLB rate limit trackers
+_rate_limit_fd_mlb  = {"remaining": 100, "reset_at": None}
+_rate_limit_mgm_mlb = {"remaining": 100, "reset_at": None}
+_rate_limit_dk_mlb  = {"remaining": 100, "reset_at": None}
+_rate_limit_cae_mlb = {"remaining": 100, "reset_at": None}
+
 _last_updated_at = None   # combined freshness (oldest of all books)
 
 # Per-book freshness timestamps
@@ -101,6 +112,78 @@ STAT_LABEL_MAP = {
 SKIP_STAT_LABELS = {
     "double+double", "triple+double", "double double", "triple double",
     "first basket scorer", "anytime scorer", "first team basket",
+}
+
+# ── MLB stat label map ────────────────────────────────────────────────────────
+# odds-api.io uses "(StatName)" parenthetical after player name for MLB props.
+MLB_STAT_LABEL_MAP = {
+    # batter
+    "hits":                  "hits",
+    "home runs":             "home_runs",
+    "total bases":           "total_bases",
+    "rbis":                  "rbis",
+    "rbi":                   "rbis",
+    "runs":                  "runs",
+    "stolen bases":          "stolen_bases",
+    "walks":                 "walks",
+    "strikeouts":            "batter_strikeouts",   # batter Ks when on batter
+    "hitter strikeouts":     "batter_strikeouts",
+    "batter strikeouts":     "batter_strikeouts",
+    "singles":               "singles",
+    "doubles":               "doubles",
+    "triples":               "triples",
+    "hits+runs+rbis":        "hits_runs_rbis",
+    "hits, runs & rbis":     "hits_runs_rbis",
+    # pitcher
+    "pitcher strikeouts":    "pitcher_strikeouts",
+    "total strikeouts":      "pitcher_strikeouts",  # DraftKings label
+    "pitching outs":         "pitching_outs",
+    "innings pitched":       "pitching_outs",
+    "hits allowed":          "hits_allowed",
+    "pitching hits":         "hits_allowed",        # DraftKings label
+    "earned runs":           "earned_runs",
+    "earned runs allowed":   "earned_runs",
+    "walks allowed":         "walks_allowed",
+    "total pitches":         "pitches_thrown",
+    "pitches thrown":        "pitches_thrown",
+    # batter (DraftKings alternate labels)
+    "runs batted in":        "rbis",
+    "runs scored":           "runs",
+}
+
+# MLB team name → ESPN abbreviation
+MLB_TEAM_NAME_TO_ESPN = {
+    "arizona diamondbacks":    "ARI",
+    "atlanta braves":          "ATL",
+    "baltimore orioles":       "BAL",
+    "boston red sox":          "BOS",
+    "chicago cubs":            "CHC",
+    "chicago white sox":       "CWS",
+    "cincinnati reds":         "CIN",
+    "cleveland guardians":     "CLE",
+    "colorado rockies":        "COL",
+    "detroit tigers":          "DET",
+    "houston astros":          "HOU",
+    "kansas city royals":      "KC",
+    "los angeles angels":      "LAA",
+    "los angeles dodgers":     "LAD",
+    "miami marlins":           "MIA",
+    "milwaukee brewers":       "MIL",
+    "minnesota twins":         "MIN",
+    "new york mets":           "NYM",
+    "new york yankees":        "NYY",
+    "oakland athletics":       "OAK",
+    "philadelphia phillies":   "PHI",
+    "pittsburgh pirates":      "PIT",
+    "san diego padres":        "SD",
+    "san francisco giants":    "SF",
+    "seattle mariners":        "SEA",
+    "st. louis cardinals":     "STL",
+    "tampa bay rays":          "TB",
+    "texas rangers":           "TEX",
+    "toronto blue jays":       "TOR",
+    "washington nationals":    "WSH",
+    "athletics":               "OAK",
 }
 
 BOOK_MAP = {
@@ -540,6 +623,224 @@ def get_oddsapi_props(wait_for_refresh=False) -> list[dict]:
 
     print(f"  [OddsAPI] Fetched {len(all_props)} props across "
           f"{games_fetched} game(s) (FD + MGM + DK + CAE)")
+    return all_props
+
+
+def _team_to_espn_mlb(name: str) -> str:
+    return MLB_TEAM_NAME_TO_ESPN.get(name.lower().strip(), "")
+
+
+def _parse_mlb_stat_from_label(label: str) -> tuple[str, str]:
+    """Parse 'Zac Gallen (Pitcher Strikeouts)' → ('Zac Gallen', 'pitcher_strikeouts')."""
+    if "(" not in label or ")" not in label:
+        return label.strip(), ""
+    paren_start = label.rfind("(")
+    player_name = label[:paren_start].strip()
+    stat_raw    = label[paren_start+1:label.rfind(")")].strip().lower()
+    stat_key    = MLB_STAT_LABEL_MAP.get(stat_raw, "")
+    return player_name, stat_key
+
+
+def _fetch_events_mlb() -> list[dict]:
+    """Fetch today's pending MLB events."""
+    if not API_KEY_FANDUEL_MLB:
+        return []
+    data = _safe_get(f"{BASE}/events", {
+        "apiKey": API_KEY_FANDUEL_MLB,
+        "sport":  "baseball",
+        "league": "usa-mlb",
+        "status": "pending",
+    }, _rate_limit_fd_mlb)
+    if not isinstance(data, list):
+        return []
+    return data
+
+
+def _build_anchor_mlb(event: dict) -> dict:
+    home_name = event.get("home", "")
+    away_name = event.get("away", "")
+    home_abbr = _team_to_espn_mlb(home_name)
+    away_abbr = _team_to_espn_mlb(away_name)
+    start_ts  = event.get("date", "")
+
+    game_date = ""
+    if start_ts:
+        try:
+            dt_utc    = datetime.fromisoformat(start_ts.replace("Z", "+00:00"))
+            et_offset = -4 if 3 <= dt_utc.month <= 11 else -5
+            dt_et     = dt_utc + timedelta(hours=et_offset)
+            game_date = dt_et.strftime("%Y-%m-%d")
+        except Exception:
+            pass
+
+    return {
+        "sgo_event_id": str(event.get("id", "")),
+        "home_abbr":    home_abbr,
+        "away_abbr":    away_abbr,
+        "start_time":   start_ts,
+        "game_date":    game_date,
+        "matchup":      f"{away_abbr} @ {home_abbr}",
+        "player_team_map": {},
+    }
+
+
+def _parse_mlb_props_from_odds(odds_data: dict, anchor: dict) -> tuple[list, datetime | None, dict]:
+    """Parse MLB player props from a single event's odds response."""
+    props      = []
+    bookmakers = odds_data.get("bookmakers", {})
+    collected: dict[tuple, dict] = {}
+    latest_updated   = None
+    book_timestamps: dict[str, datetime] = {}
+
+    for book_name, markets in bookmakers.items():
+        our_book = BOOK_MAP.get(book_name.lower())
+        if not our_book:
+            continue
+
+        for market in markets:
+            if "Player Props" not in market.get("name", ""):
+                continue
+
+            updated_str = market.get("updatedAt", "")
+            if updated_str:
+                try:
+                    ts = datetime.fromisoformat(updated_str.replace("Z", "+00:00"))
+                    if latest_updated is None or ts > latest_updated:
+                        latest_updated = ts
+                    if our_book not in book_timestamps or ts > book_timestamps[our_book]:
+                        book_timestamps[our_book] = ts
+                except Exception:
+                    pass
+
+            for odd in market.get("odds", []):
+                label     = odd.get("label", "")
+                hdp       = odd.get("hdp")
+                over_str  = odd.get("over")
+                under_str = odd.get("under")
+
+                if not label or not over_str or not under_str or hdp is None:
+                    continue
+                try:
+                    float(over_str); float(under_str)
+                except (TypeError, ValueError):
+                    continue
+
+                player_name, stat_key = _parse_mlb_stat_from_label(label)
+                if not stat_key:
+                    continue
+
+                key = (player_name, stat_key, float(hdp))
+                if key not in collected:
+                    collected[key] = {}
+                collected[key][our_book] = {
+                    "line":          float(hdp),
+                    "over_decimal":  float(over_str),
+                    "under_decimal": float(under_str),
+                    "over_american": _decimal_to_american(over_str),
+                    "under_american":_decimal_to_american(under_str),
+                }
+
+    # Keep main line per (player, stat, book) — least juice wins
+    main_lines: dict[tuple, dict] = {}
+    for (player_name, stat_key, line), book_data in collected.items():
+        for our_book, bdata in book_data.items():
+            key   = (player_name, stat_key, our_book)
+            score = abs(bdata["over_decimal"] - 1.909) + abs(bdata["under_decimal"] - 1.909)
+            bdata["_line"]  = line
+            bdata["_score"] = score
+            if key not in main_lines or score < main_lines[key]["_score"]:
+                main_lines[key] = bdata
+
+    for (player_name, stat_key, our_book), bdata in main_lines.items():
+        over_am  = bdata["over_american"]
+        under_am = bdata["under_american"]
+        if not over_am or not under_am:
+            continue
+        props.append({
+            "player":        player_name,
+            "stat":          stat_key,
+            "line":          bdata["_line"],
+            "over_price":    over_am,
+            "under_price":   under_am,
+            "over_decimal":  bdata["over_decimal"],
+            "under_decimal": bdata["under_decimal"],
+            "bookmaker":     our_book,
+            "sgo_event_id":  anchor["sgo_event_id"],
+            "home_abbr":     anchor["home_abbr"],
+            "away_abbr":     anchor["away_abbr"],
+            "start_time":    anchor["start_time"],
+            "game_date":     anchor["game_date"],
+            "matchup":       anchor["matchup"],
+            "player_team":   "",
+            "sport":         "MLB",
+        })
+
+    return props, latest_updated, book_timestamps
+
+
+def get_oddsapi_mlb_props() -> list[dict]:
+    """
+    Fetch FD + MGM + DK + Caesars MLB player props using the 4 dedicated MLB API keys.
+    Returns same prop dict format as get_oddsapi_props() but with sport='MLB'.
+    """
+    if not API_KEY_FANDUEL_MLB:
+        print("  [OddsAPI MLB] No MLB keys configured — skipping")
+        return []
+
+    events = _fetch_events_mlb()
+    if not events:
+        print("  [OddsAPI MLB] No MLB events found")
+        return []
+
+    now = datetime.now(timezone.utc)
+    upcoming = []
+    for e in events:
+        try:
+            game_time = datetime.fromisoformat(e["date"].replace("Z", "+00:00"))
+            if now - timedelta(hours=3) <= game_time <= now + timedelta(hours=24):
+                upcoming.append(e)
+        except Exception:
+            pass
+
+    if not upcoming:
+        print("  [OddsAPI MLB] No games in the next 24 hours")
+        return []
+
+    print(f"  [OddsAPI MLB] Fetching props for {len(upcoming)} game(s)")
+
+    all_props     = []
+    games_fetched = 0
+
+    def fetch_book(api_key, tracker, book_label):
+        return _safe_get(f"{BASE}/odds", {
+            "apiKey":     api_key,
+            "eventId":    event["id"],
+            "bookmakers": book_label,
+        }, tracker)
+
+    for event in upcoming:
+        anchor = None
+
+        for api_key, tracker, label in [
+            (API_KEY_FANDUEL_MLB,    _rate_limit_fd_mlb,  "FanDuel"),
+            (API_KEY_BETMGM_MLB,     _rate_limit_mgm_mlb, "BetMGM"),
+            (API_KEY_DRAFTKINGS_MLB, _rate_limit_dk_mlb,  "DraftKings"),
+            (API_KEY_CAESARS_MLB,    _rate_limit_cae_mlb, "Caesars"),
+        ]:
+            if not api_key:
+                continue
+            data = fetch_book(api_key, tracker, label)
+            if not data:
+                continue
+            if anchor is None:
+                anchor = _build_anchor_mlb(event)
+            props, ts, bts = _parse_mlb_props_from_odds(data, anchor)
+            all_props.extend(props)
+
+        if anchor:
+            games_fetched += 1
+
+    print(f"  [OddsAPI MLB] Fetched {len(all_props)} props across {games_fetched} game(s)")
     return all_props
 
 

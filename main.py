@@ -7,6 +7,7 @@ from scipy.stats import norm
 from datetime import datetime, timezone
 
 STAT_KEY_MAP = {
+    # NBA
     "points":   "PTS",
     "rebounds": "REB",
     "assists":  "AST",
@@ -15,9 +16,29 @@ STAT_KEY_MAP = {
     "threes":   "3PM",
     "pr":       "PR",
     "pa":       "PA",
+    # MLB (display labels)
+    "hits":               "HITS",
+    "rbis":               "RBIS",
+    "home_runs":          "HR",
+    "total_bases":        "TB",
+    "runs":               "RUNS",
+    "batter_strikeouts":  "KS",
+    "stolen_bases":       "SB",
+    "singles":            "1B",
+    "doubles":            "2B",
+    "triples":            "3B",
+    "hits_runs_rbis":     "HRR",
+    "walks":              "BB",
+    "pitcher_strikeouts": "PKS",
+    "pitching_outs":      "OUTS",
+    "hits_allowed":       "HA",
+    "earned_runs":        "ER",
+    "walks_allowed":      "WA",
+    "pitches_thrown":     "PTCH",
 }
 
 SIGMA = {
+    # NBA
     "points":   7.0,
     "pra":      8.0,
     "ra":       4.5,
@@ -26,6 +47,25 @@ SIGMA = {
     "threes":   1.3,
     "pr":       7.5,
     "pa":       7.5,
+    # MLB — standard deviations of actual outcomes around typical lines
+    "hits":               0.85,
+    "rbis":               0.90,
+    "home_runs":          0.45,
+    "total_bases":        1.40,
+    "runs":               0.85,
+    "batter_strikeouts":  0.90,
+    "stolen_bases":       0.50,
+    "singles":            0.75,
+    "doubles":            0.50,
+    "triples":            0.30,
+    "hits_runs_rbis":     2.00,
+    "walks":              0.60,
+    "pitcher_strikeouts": 2.50,
+    "pitching_outs":      3.50,
+    "hits_allowed":       2.00,
+    "earned_runs":        1.50,
+    "walks_allowed":      1.30,
+    "pitches_thrown":     12.0,
 }
 
 BOOK_WEIGHTS = {
@@ -121,11 +161,48 @@ def flatten_pp_props(pp_props):
     return flat
 
 
+def flatten_pp_mlb_props(pp_mlb_props: list) -> list:
+    """
+    Flatten PrizePicks MLB player list → list of individual prop dicts,
+    tagged with sport='MLB' for downstream routing.
+    """
+    flat = []
+    for p in pp_mlb_props:
+        for stat_key, line in p["props"].items():
+            if stat_key not in SIGMA:
+                continue  # unknown stat — no sigma, skip
+            flat.append({
+                "player":      p["name"],
+                "stat":        stat_key,
+                "line":        float(line),
+                "over_price":  None,
+                "under_price": None,
+                "sport":       "MLB",
+                "sgo_event_id": None,
+                "home_abbr":    None,
+                "away_abbr":    None,
+                "start_time":   None,
+                "game_date":    None,
+                "matchup":      None,
+            })
+    return flat
+
+
 # ── Sportsbook prop builder ───────────────────────────────────────────────────
 
 LABEL_TO_KEY = {
+    # NBA
     "PTS": "points", "REB": "rebounds", "AST": "assists",
     "3PM": "threes", "PRA": "pra", "PR": "pr", "PA": "pa", "RA": "ra",
+    # MLB (internal keys pass through as-is from oddsapi/pinnacle/DK)
+    "hits": "hits", "rbis": "rbis", "home_runs": "home_runs",
+    "total_bases": "total_bases", "runs": "runs",
+    "batter_strikeouts": "batter_strikeouts", "stolen_bases": "stolen_bases",
+    "singles": "singles", "doubles": "doubles", "triples": "triples",
+    "hits_runs_rbis": "hits_runs_rbis", "walks": "walks",
+    "pitcher_strikeouts": "pitcher_strikeouts", "pitching_outs": "pitching_outs",
+    "hits_allowed": "hits_allowed", "earned_runs": "earned_runs",
+    "walks_allowed": "walks_allowed", "pitches_thrown": "pitches_thrown",
 }
 
 
@@ -467,6 +544,7 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
             "player":        player,
             "team":          team,
             "stat":          stat_key,
+            "sport":         prop.get("sport", "NBA"),
             "platform_line": platform_line,
             "sb_line":       avg_line,
             "books":         len(sb_only),

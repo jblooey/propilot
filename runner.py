@@ -8,14 +8,15 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 load_dotenv()
 
-from prizepicks import get_prizepicks_nba as get_prizepicks_props
-from underdog import get_ud_props
+from prizepicks import get_prizepicks_nba as get_prizepicks_props, get_prizepicks_mlb
+from underdog import get_ud_props, get_ud_mlb_props
 from draftkings import get_dk_props
-from pinnacle import get_pinnacle_props
+from pinnacle import get_pinnacle_props, get_pinnacle_mlb_props
 import oddsapi as _oddsapi
-from oddsapi import get_oddsapi_props
+from oddsapi import get_oddsapi_props, get_oddsapi_mlb_props
 from main import (
-    build_sb_props, flatten_pp_props, find_edges, print_edges,
+    build_sb_props, flatten_pp_props, flatten_pp_mlb_props,
+    find_edges, print_edges,
     build_player_team_map, names_match,
     weighted_consensus, SIGMA, STAT_KEY_MAP,
 )
@@ -38,6 +39,14 @@ PUSHOVER_USERS = [
 
 alerted_slips = set()
 last_edges    = []
+
+# MLB fetches on a slower 20-min cycle to stay under 100 req/hour per key
+MLB_FETCH_INTERVAL = 1200  # 20 minutes
+_last_mlb_fetch_at  = None
+_last_pp_mlb_props  = []
+_last_ud_mlb_props  = []
+_last_pin_mlb_props = []
+_last_oddsapi_mlb_props = []
 
 STAT_LABEL_TO_KEY = {
     "POINTS": "points", "REBOUNDS": "rebounds", "ASSISTS": "assists",
@@ -120,8 +129,17 @@ def settle_only():
         traceback.print_exc()
 
 
+def _should_fetch_mlb() -> bool:
+    global _last_mlb_fetch_at
+    now = datetime.now(timezone.utc)
+    if _last_mlb_fetch_at is None:
+        return True
+    return (now - _last_mlb_fetch_at).total_seconds() >= MLB_FETCH_INTERVAL
+
+
 def run():
-    global last_edges
+    global last_edges, _last_mlb_fetch_at
+    global _last_pp_mlb_props, _last_ud_mlb_props, _last_pin_mlb_props, _last_oddsapi_mlb_props
     print(f"\n{'#'*60}")
     print(f"  RUN AT {datetime.now().strftime('%I:%M:%S %p')}")
     print(f"{'#'*60}")
@@ -147,35 +165,88 @@ def run():
         sb_props        = build_sb_props(dk_props, pinnacle_props, oddsapi_props)
         player_team_map = build_player_team_map()
 
-        print("Fetching PrizePicks...")
+        print("Fetching PrizePicks NBA...")
         pp_props = get_prizepicks_props()
         print(f"  {len(pp_props)} props")
 
-        print("Fetching Underdog...")
+        print("Fetching Underdog NBA...")
         ud_props = get_ud_props()
         print(f"  {len(ud_props)} props")
 
-        pp_flat = flatten_pp_props(pp_props)
-        ud_flat = ud_props
+        fetch_mlb = _should_fetch_mlb()
+        if fetch_mlb:
+            print("Fetching PrizePicks MLB...")
+            pp_mlb_props = get_prizepicks_mlb()
+            print(f"  {len(pp_mlb_props)} players")
+
+            print("Fetching Underdog MLB...")
+            ud_mlb_props = get_ud_mlb_props()
+            print(f"  {len(ud_mlb_props)} props")
+
+            print("Fetching Pinnacle MLB...")
+            pin_mlb_props = get_pinnacle_mlb_props()
+            print(f"  {len(pin_mlb_props)} props")
+
+            print("Fetching OddsAPI MLB...")
+            oddsapi_mlb_props = get_oddsapi_mlb_props()
+            print(f"  {len(oddsapi_mlb_props)} props")
+
+            _last_mlb_fetch_at      = datetime.now(timezone.utc)
+            _last_pp_mlb_props      = pp_mlb_props
+            _last_ud_mlb_props      = ud_mlb_props
+            _last_pin_mlb_props     = pin_mlb_props
+            _last_oddsapi_mlb_props = oddsapi_mlb_props
+        else:
+            mins_left = int((MLB_FETCH_INTERVAL - (datetime.now(timezone.utc) - _last_mlb_fetch_at).total_seconds()) / 60)
+            print(f"  [MLB] Skipping fetch — next in ~{mins_left}m (using cached data)")
+            pp_mlb_props      = _last_pp_mlb_props
+            ud_mlb_props      = _last_ud_mlb_props
+            pin_mlb_props     = _last_pin_mlb_props
+            oddsapi_mlb_props = _last_oddsapi_mlb_props
+
+        # Build separate sportsbook prop dicts for each sport
+        pp_nba_flat = flatten_pp_props(pp_props)
+        pp_mlb_flat = flatten_pp_mlb_props(pp_mlb_props)
+        ud_nba_flat = ud_props
+        ud_mlb_flat = ud_mlb_props
+
+        # NBA sb_props — existing pipeline (DK + Pinnacle NBA + oddsapi NBA)
+        sb_props = build_sb_props(dk_props, pinnacle_props, oddsapi_props)
+
+        # MLB sb_props — Pinnacle MLB + oddsapi MLB (no DK scraper for MLB yet)
+        sb_mlb_props = build_sb_props([], pin_mlb_props, oddsapi_mlb_props)
 
         stale_books = _oddsapi.get_stale_books()
         if stale_books:
             print(f"  [OddsAPI] Stale books excluded from consensus: {', '.join(stale_books)}")
 
-        pp_edges = find_edges(
-            pp_flat, sb_props, "PP",
-            ref_props=ud_flat,
+        # NBA edges
+        pp_nba_edges = find_edges(
+            pp_nba_flat, sb_props, "PP",
+            ref_props=ud_nba_flat,
             player_team_map=player_team_map,
             stale_books=stale_books,
         )
-        ud_edges = find_edges(
-            ud_flat, sb_props, "UD",
-            ref_props=pp_flat,
+        ud_nba_edges = find_edges(
+            ud_nba_flat, sb_props, "UD",
+            ref_props=pp_nba_flat,
             player_team_map=player_team_map,
             stale_books=stale_books,
         )
 
-        all_edges        = ud_edges + pp_edges
+        # MLB edges
+        pp_mlb_edges = find_edges(
+            pp_mlb_flat, sb_mlb_props, "PP",
+            ref_props=ud_mlb_flat,
+            stale_books=stale_books,
+        )
+        ud_mlb_edges = find_edges(
+            ud_mlb_flat, sb_mlb_props, "UD",
+            ref_props=pp_mlb_flat,
+            stale_books=stale_books,
+        )
+
+        all_edges = ud_nba_edges + pp_nba_edges + ud_mlb_edges + pp_mlb_edges
         sharp_edges      = [e for e in all_edges if e.get("has_sharp")]
         last_edges = all_edges
         print_edges(all_edges)
@@ -198,7 +269,8 @@ def run():
             print(f"  [Cache] Failed to write edges: {cache_err}")
 
         # Always update active bet probs (even during quiet hours)
-        recalculate_active_bets(sb_props)
+        # Pass combined sb_props for NBA; MLB bets recalculate against sb_mlb_props
+        recalculate_active_bets(sb_props, mlb_sb_props=sb_mlb_props)
 
         # Check if we're in quiet hours (11:59 PM–9 AM ET) — no new bets or slips
         in_quiet_hours = _in_quiet_hours()

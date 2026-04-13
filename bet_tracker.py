@@ -208,6 +208,171 @@ def _get_team_abbrs_from_event(event: dict) -> set:
     return abbrs
 
 
+# ── ESPN MLB stat parsing ─────────────────────────────────────────────────────
+
+# Which internal stat keys belong to pitchers vs batters
+MLB_PITCHER_STATS = {
+    "pitcher_strikeouts", "pitching_outs", "hits_allowed",
+    "earned_runs", "walks_allowed", "pitches_thrown",
+}
+MLB_BATTER_STATS = {
+    "hits", "rbis", "home_runs", "total_bases", "runs",
+    "batter_strikeouts", "stolen_bases", "singles", "doubles",
+    "triples", "hits_runs_rbis", "walks",
+}
+
+# ESPN MLB batter stat keys (from boxscore "players" group without fullInnings)
+ESPN_MLB_BATTER_KEYS = {
+    "hits":              "hits",
+    "rbis":              "RBIs",
+    "home_runs":         "homeRuns",
+    "runs":              "runs",
+    "batter_strikeouts": "strikeouts",
+    "walks":             "walks",
+}
+# ESPN MLB pitcher stat keys (from boxscore group with fullInnings.partInnings)
+ESPN_MLB_PITCHER_KEYS = {
+    "pitcher_strikeouts": "strikeouts",
+    "hits_allowed":       "hits",
+    "earned_runs":        "earnedRuns",
+    "walks_allowed":      "walks",
+    "pitches_thrown":     "pitches",
+}
+
+
+def _parse_espn_mlb_stats(game_data: dict) -> tuple[dict, dict]:
+    """
+    Parse an ESPN MLB game summary into batter and pitcher stat dicts.
+    Returns:
+        batter_stats:  { player_name_lower: { name, hits, rbis, home_runs, ... } }
+        pitcher_stats: { player_name_lower: { name, pitcher_strikeouts, pitching_outs, ... } }
+    """
+    batter_stats  = {}
+    pitcher_stats = {}
+
+    def safe_int(val):
+        try:
+            return int(str(val).split("-")[0]) if val not in (None, "", "--") else 0
+        except (ValueError, TypeError):
+            return 0
+
+    for team_block in game_data.get("boxscore", {}).get("players", []):
+        for stat_group in team_block.get("statistics", []):
+            keys = stat_group.get("keys", [])
+            if not keys:
+                continue
+
+            is_pitcher = "fullInnings.partInnings" in keys
+
+            for athlete_entry in stat_group.get("athletes", []):
+                name = athlete_entry.get("athlete", {}).get("displayName", "")
+                if not name:
+                    continue
+                kv = dict(zip(keys, athlete_entry.get("stats", [])))
+
+                if is_pitcher:
+                    # Convert innings pitched to total outs
+                    ip_str = kv.get("fullInnings.partInnings", "0.0")
+                    try:
+                        parts     = str(ip_str).split(".")
+                        full_inn  = int(parts[0])
+                        part_outs = int(parts[1]) if len(parts) > 1 else 0
+                        outs      = full_inn * 3 + part_outs
+                    except (ValueError, IndexError):
+                        outs = 0
+
+                    pitcher_stats[name.lower()] = {
+                        "name":               name,
+                        "pitcher_strikeouts": safe_int(kv.get("strikeouts")),
+                        "pitching_outs":      outs,
+                        "hits_allowed":       safe_int(kv.get("hits")),
+                        "earned_runs":        safe_int(kv.get("earnedRuns")),
+                        "walks_allowed":      safe_int(kv.get("walks")),
+                        "pitches_thrown":     safe_int(kv.get("pitches")),
+                    }
+                else:
+                    # Batter — compute total_bases from slugging * AB if available
+                    at_bats  = safe_int(kv.get("atBats"))
+                    slug_str = kv.get("slugAvg", "0")
+                    try:
+                        total_bases = round(float(slug_str) * at_bats)
+                    except (ValueError, TypeError):
+                        total_bases = 0
+
+                    hits = safe_int(kv.get("hits"))
+                    runs = safe_int(kv.get("runs"))
+                    rbis = safe_int(kv.get("RBIs"))
+
+                    batter_stats[name.lower()] = {
+                        "name":              name,
+                        "hits":              hits,
+                        "rbis":              rbis,
+                        "home_runs":         safe_int(kv.get("homeRuns")),
+                        "runs":              runs,
+                        "batter_strikeouts": safe_int(kv.get("strikeouts")),
+                        "walks":             safe_int(kv.get("walks")),
+                        "total_bases":       total_bases,
+                        "hits_runs_rbis":    hits + runs + rbis,
+                    }
+
+    return batter_stats, pitcher_stats
+
+
+def _espn_mlb_scoreboard(date_str: str) -> list:
+    """Return events list from ESPN MLB scoreboard for a YYYYMMDD date string."""
+    try:
+        r = requests.get(
+            "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard",
+            params={"dates": date_str},
+            timeout=15,
+        )
+        return r.json().get("events", []) if r.status_code == 200 else []
+    except Exception as e:
+        print(f"  [ESPN MLB] Scoreboard error ({date_str}): {e}")
+        return []
+
+
+def _espn_mlb_summary(game_id: str) -> dict | None:
+    """Return full MLB game summary JSON from ESPN."""
+    try:
+        r = requests.get(
+            "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary",
+            params={"event": game_id},
+            timeout=15,
+        )
+        return r.json() if r.status_code == 200 else None
+    except Exception as e:
+        print(f"  [ESPN MLB] Summary error (game {game_id}): {e}")
+        return None
+
+
+def calculate_mlb_result(bet: dict, batter_stats: dict, pitcher_stats: dict) -> tuple[str, str]:
+    """
+    Calculate the result of an MLB bet.
+    Routes to batter or pitcher stats based on the stat key.
+    """
+    stat = bet["stat"]
+    is_pitcher_stat = stat in MLB_PITCHER_STATS
+
+    stats_dict = pitcher_stats if is_pitcher_stat else batter_stats
+    player_stats = _fuzzy_find_player(bet["player"], stats_dict)
+
+    if player_stats is None:
+        return "pending", "Player not found in MLB box score"
+
+    actual = player_stats.get(stat)
+    if actual is None:
+        return "pending", f"Stat '{stat}' not in parsed MLB stats"
+
+    line = bet["line"]
+    if actual == line:
+        return "void", f"Exact push ({actual} = {line})"
+    elif bet["direction"] == "OVER":
+        return ("hit" if actual > line else "miss"), f"Actual: {actual}, Line: {line}"
+    else:
+        return ("hit" if actual < line else "miss"), f"Actual: {actual}, Line: {line}"
+
+
 # ── Game anchor matching ──────────────────────────────────────────────────────
 
 # Sportsbook scrapers use different abbreviations than ESPN for a handful of teams.
@@ -383,19 +548,18 @@ def add_bet(edge: dict) -> dict | None:
         "player":       edge["player"],
         "team":         team,
         "stat":         edge["stat"],
+        "sport":        edge.get("sport", "NBA"),
         "direction":    edge["direction"],
         "line":         edge["platform_line"],
         "added_prob":   edge["prob"],
         "current_prob": edge["prob"],
         "added_at":     datetime.now().strftime("%Y-%m-%d %I:%M %p"),
         "game_date":    game_date,
-        # Game anchor — used by auto_settle to find the exact ESPN box score
-        # If home_abbr/away_abbr are empty, auto_settle falls back to date+player search
         "home_abbr":    home_abbr,
         "away_abbr":    away_abbr,
         "start_time":   edge.get("start_time", ""),
         "matchup":      edge.get("matchup", ""),
-        "anchor_ok":    has_anchor,  # False = no anchor, settle may be less reliable
+        "anchor_ok":    has_anchor,
         "books_at_add": {
             "pin": edge["pin"], "fd": edge["fd"],
             "dk":  edge["dk"],  "mgm": edge["mgm"],
@@ -444,7 +608,7 @@ def update_bets(all_edges: list):
         print(f"  [Tracker] Updated {updated} active bet(s)")
 
 
-def recalculate_active_bets(sb_props: dict):
+def recalculate_active_bets(sb_props: dict, mlb_sb_props: dict | None = None):
     from main import SIGMA, SPORTSBOOKS, weighted_consensus, names_match, decimal_to_american
 
     bets   = load_bets()
@@ -458,8 +622,11 @@ def recalculate_active_bets(sb_props: dict):
         if not sigma:
             continue
 
+        # Route to the correct sportsbook prop dict based on sport
+        props_dict = mlb_sb_props if (bet.get("sport") == "MLB" and mlb_sb_props) else sb_props
+
         sb_entry = None
-        for sb_name, sb_data in sb_props.items():
+        for sb_name, sb_data in props_dict.items():
             if names_match(bet["player"], sb_name):
                 sb_entry = sb_data
                 break
@@ -589,15 +756,135 @@ def calculate_result(bet: dict, player_stats: dict) -> tuple[str, str]:
         return ("hit" if actual < line else "miss"), f"Actual: {actual}, Line: {line}"
 
 
+def _settle_bets_for_sport(bets, sport, scoreboard_fn, summary_fn, dates_needed):
+    """Settle all pending bets for a given sport. Returns count settled."""
+    active = [b for b in bets if b["result"] is None and b.get("sport", "NBA") == sport]
+    if not active:
+        return 0
+
+    events_by_date: dict[str, list] = {}
+    for date_str in sorted(dates_needed):
+        events_by_date[date_str] = scoreboard_fn(date_str)
+
+    # game_id → stats payload (dict for NBA, (batter_dict, pitcher_dict) for MLB)
+    game_data:  dict = {}
+    game_teams: dict[str, set] = {}
+
+    for date_str, events in events_by_date.items():
+        for event in events:
+            status = event.get("status", {}).get("type", {})
+            if status.get("name") != "STATUS_FINAL" and not status.get("completed", False):
+                continue
+            game_id = event["id"]
+            if game_id in game_data:
+                continue
+            game_teams[game_id] = _get_team_abbrs_from_event(event)
+            summary = summary_fn(game_id)
+            if summary:
+                game_data[game_id] = (
+                    _parse_espn_mlb_stats(summary) if sport == "MLB"
+                    else _build_player_stats_from_game(summary)
+                )
+            else:
+                game_data[game_id] = ({}, {}) if sport == "MLB" else {}
+
+    completed_ids = set(game_data.keys())
+    print(f"  [Auto-settle {sport}] {len(completed_ids)} completed game(s)")
+
+    def _calc(bet, payload):
+        if sport == "MLB":
+            b, p = payload if isinstance(payload, tuple) else ({}, {})
+            return calculate_mlb_result(bet, b, p)
+        return calculate_result(bet, payload if payload else {})
+
+    settled = 0
+    for bet in bets:
+        if bet["result"] is not None or bet.get("sport", "NBA") != sport:
+            continue
+
+        matched_event = find_espn_game_for_bet(bet, events_by_date)
+
+        if matched_event is None:
+            bet_date_str = bet.get("game_date", "").replace("-", "")
+            if not bet_date_str:
+                print(f"  [Auto-settle] No anchor/date for {bet['player']} — skipping")
+                continue
+            date_restricted_ids = {
+                ev["id"] for ev in events_by_date.get(bet_date_str, [])
+                if ev["id"] in completed_ids
+            }
+            if not date_restricted_ids:
+                continue
+            print(f"  [Auto-settle] No anchor for {bet['player']} "
+                  f"({bet.get('matchup','?')}) — searching {len(date_restricted_ids)} game(s)")
+            matched_payload = None
+            for game_id in date_restricted_ids:
+                payload = game_data.get(game_id, {})
+                result, _ = _calc(bet, payload)
+                if result != "pending":
+                    espn_teams = {bet.get("home_abbr",""), bet.get("away_abbr","")} - {""}
+                    bet_team   = bet.get("team", "")
+                    game_abbrs = game_teams.get(game_id, set())
+                    if espn_teams and not espn_teams & game_abbrs:
+                        continue
+                    elif not espn_teams and bet_team and bet_team not in game_abbrs:
+                        continue
+                    matched_payload = payload
+                    break
+        else:
+            game_id = matched_event["id"]
+            if game_id not in completed_ids:
+                continue
+            matched_payload = game_data.get(game_id)
+
+        if matched_payload is None:
+            espn_teams  = {bet.get("home_abbr",""), bet.get("away_abbr","")} - {""}
+            bet_team    = bet.get("team", "")
+            team_tokens = espn_teams if espn_teams else ({bet_team} if bet_team else set())
+            if team_tokens:
+                for gid in completed_ids:
+                    if team_tokens & game_teams.get(gid, set()):
+                        gd = bet.get("game_date", "").replace("-", "")
+                        for date_str, events in events_by_date.items():
+                            for ev in events:
+                                try:
+                                    diff = abs((
+                                        datetime.strptime(date_str, "%Y%m%d") -
+                                        datetime.strptime(gd or date_str, "%Y%m%d")
+                                    ).days)
+                                except ValueError:
+                                    diff = 999
+                                if ev["id"] == gid and diff <= 1:
+                                    bet["result"]     = "void"
+                                    bet["reason"]     = "Inactive scratch (not in box score)"
+                                    bet["settled_at"] = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+                                    print(f"  [VOID] {bet['player']} — inactive scratch "
+                                          f"({'/'.join(sorted(team_tokens))} played)")
+                                    settled += 1
+                                    break
+            continue
+
+        result, reason = _calc(bet, matched_payload)
+        if result == "pending":
+            continue
+
+        bet["result"]     = result
+        bet["reason"]     = reason
+        bet["settled_at"] = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+        icon = "✅" if result == "hit" else "❌" if result == "miss" else "∅"
+        print(f"  [{result.upper()}] {icon} {bet['player']} {bet['direction']} "
+              f"{bet['line']} {bet['stat']} | {reason} | {bet.get('matchup','?')}")
+        settled += 1
+
+    return settled
+
+
 # ── Auto Settle ───────────────────────────────────────────────────────────────
 
 def auto_settle():
     """
-    For each pending bet, use the stored game anchor (home_abbr + away_abbr + game_date)
-    to find the exact ESPN box score and settle the result.
-
-    This is safe even for bets placed days in advance because we match on the
-    specific team matchup, not just "today's games".
+    For each pending bet, use the stored game anchor to find the ESPN box score.
+    Routes NBA bets to the NBA endpoint and MLB bets to the MLB endpoint.
     """
     bets   = load_bets()
     active = [b for b in bets if b["result"] is None]
@@ -605,7 +892,6 @@ def auto_settle():
         print("  [Auto-settle] No pending bets")
         return
 
-    # Collect all unique dates we need to check (stored game_date ± 1 for safety)
     dates_needed = set()
     for bet in active:
         gd = bet.get("game_date", "")
@@ -616,143 +902,16 @@ def auto_settle():
                     dates_needed.add((base + timedelta(days=delta)).strftime("%Y%m%d"))
             except ValueError:
                 pass
-
-    # Also always check today and yesterday in case game_date is missing
     today     = date.today()
     yesterday = today - timedelta(days=1)
     dates_needed.add(today.strftime("%Y%m%d"))
     dates_needed.add(yesterday.strftime("%Y%m%d"))
 
-    # Fetch scoreboard events for all needed dates
     print(f"  [Auto-settle] Checking {len(dates_needed)} date(s): {sorted(dates_needed)}")
-    events_by_date: dict[str, list] = {}
-    for date_str in sorted(dates_needed):
-        events_by_date[date_str] = _espn_scoreboard(date_str)
 
-    # For each completed game found, pre-fetch its box score
-    game_player_stats: dict[str, dict] = {}   # game_id → player stats
-    game_teams:        dict[str, set]  = {}   # game_id → {abbr, abbr}
-
-    for date_str, events in events_by_date.items():
-        for event in events:
-            status = event.get("status", {}).get("type", {})
-            if status.get("name") != "STATUS_FINAL" and not status.get("completed", False):
-                continue
-            game_id = event["id"]
-            if game_id in game_player_stats:
-                continue  # already fetched
-
-            game_teams[game_id] = _get_team_abbrs_from_event(event)
-
-            summary = _espn_summary(game_id)
-            if summary:
-                game_player_stats[game_id] = _build_player_stats_from_game(summary)
-            else:
-                game_player_stats[game_id] = {}
-
-    completed_ids = set(game_player_stats.keys())
-    print(f"  [Auto-settle] {len(completed_ids)} completed game(s) found")
-
-    if not completed_ids:
-        print("  [Auto-settle] No completed games — nothing to settle yet")
-        return
-
-    settled = 0
-    for bet in bets:
-        if bet["result"] is not None:
-            continue
-
-        # Find the ESPN game for this bet using its anchor
-        matched_event = find_espn_game_for_bet(bet, events_by_date)
-
-        if matched_event is None:
-            # No anchor match — fallback: find player in a completed game
-            # STRICT: only look at games on the exact game_date stored on the bet.
-            # This prevents settling against a stale box score from a different day.
-            bet_game_date_str = bet.get("game_date", "").replace("-", "")
-            if not bet_game_date_str:
-                print(f"  [Auto-settle] No anchor and no game_date for {bet['player']} — skipping")
-                continue
-
-            date_restricted_ids = {
-                ev["id"]
-                for ev in events_by_date.get(bet_game_date_str, [])
-                if ev["id"] in completed_ids
-            }
-
-            if not date_restricted_ids:
-                # No completed games on the exact bet date yet — don't settle
-                continue
-
-            print(f"  [Auto-settle] No anchor for {bet['player']} "
-                  f"({bet.get('matchup', '?')}) — searching {len(date_restricted_ids)} "
-                  f"game(s) on {bet['game_date']}")
-            matched_stats = None
-            for game_id in date_restricted_ids:
-                stats = game_player_stats.get(game_id, {})
-                result, reason = calculate_result(bet, stats)
-                if result != "pending":
-                    # Confirm the team played — use ESPN-derived abbrs (home_abbr/away_abbr)
-                    # to avoid mismatches with platform-scraped team codes (e.g. NY vs NYK)
-                    espn_teams = {bet.get("home_abbr", ""), bet.get("away_abbr", "")} - {""}
-                    bet_team   = bet.get("team", "")
-                    game_abbrs = game_teams.get(game_id, set())
-                    if espn_teams:
-                        if not espn_teams & game_abbrs:
-                            continue
-                    elif bet_team and bet_team not in game_abbrs:
-                        continue
-                    matched_stats = stats
-                    break
-        else:
-            game_id = matched_event["id"]
-            if game_id not in completed_ids:
-                # Game found but not yet final
-                continue
-            matched_stats = game_player_stats.get(game_id)
-
-        if matched_stats is None:
-            # Player's team played but player not in box score → inactive scratch
-            # Use ESPN-derived abbrs (home_abbr/away_abbr) to avoid scraper mismatches
-            espn_teams = {bet.get("home_abbr", ""), bet.get("away_abbr", "")} - {""}
-            bet_team   = bet.get("team", "")
-            team_tokens = espn_teams if espn_teams else ({bet_team} if bet_team else set())
-            if team_tokens:
-                for gid in completed_ids:
-                    if team_tokens & game_teams.get(gid, set()):
-                        gd = bet.get("game_date", "").replace("-", "")
-                        # Only void if the game was on the expected date (±1 day)
-                        for date_str, events in events_by_date.items():
-                            for ev in events:
-                                try:
-                                    date_diff = abs(
-                                        (datetime.strptime(date_str, "%Y%m%d") -
-                                         datetime.strptime(gd or date_str, "%Y%m%d")).days
-                                    )
-                                except ValueError:
-                                    date_diff = 999
-                                if ev["id"] == gid and date_diff <= 1:
-                                    bet["result"]     = "void"
-                                    bet["reason"]     = "Inactive scratch (not in box score)"
-                                    bet["settled_at"] = datetime.now().strftime("%Y-%m-%d %I:%M %p")
-                                    team_disp = "/".join(sorted(team_tokens))
-                                    print(f"  [VOID] {bet['player']} — inactive scratch "
-                                          f"({team_disp} played)")
-                                    settled += 1
-                                    break
-            continue
-
-        result, reason = calculate_result(bet, matched_stats)
-        if result == "pending":
-            continue  # game finished but player not yet in box score — wait for ESPN to update
-
-        bet["result"]     = result
-        bet["reason"]     = reason
-        bet["settled_at"] = datetime.now().strftime("%Y-%m-%d %I:%M %p")
-        icon = "✅" if result == "hit" else "❌" if result == "miss" else "∅"
-        print(f"  [{result.upper()}] {icon} {bet['player']} {bet['direction']} "
-              f"{bet['line']} {bet['stat']} | {reason} | {bet.get('matchup', '?')}")
-        settled += 1
+    settled  = 0
+    settled += _settle_bets_for_sport(bets, "NBA", _espn_scoreboard,     _espn_summary,     dates_needed)
+    settled += _settle_bets_for_sport(bets, "MLB", _espn_mlb_scoreboard, _espn_mlb_summary, dates_needed)
 
     if settled:
         save_bets(bets)
