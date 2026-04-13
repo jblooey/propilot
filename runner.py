@@ -278,22 +278,9 @@ def run():
             # Update active bet tracker (add new bets) — sharp edges only
             update_bets(sharp_edges)
 
-            # Auto-generate new slips and alert on new ones
-            # Skip if FD/BetMGM data is stale (>240s old) — stale lines mean EV calc is unreliable
-            DATA_MAX_AGE_SECS = 240
-            last_updated = _oddsapi._last_updated_at
-            if last_updated is not None:
-                data_age = (datetime.now(timezone.utc) - last_updated).total_seconds()
-                if data_age > DATA_MAX_AGE_SECS:
-                    print(f"  [Slips] Skipping slip generation — FD/BetMGM data is {int(data_age)}s old (max {DATA_MAX_AGE_SECS}s)")
-                    auto_generate_slips([])
-                    new_slips = []
-                else:
-                    new_slips = auto_generate_slips(sharp_edges)
-            else:
-                print(f"  [Slips] Skipping slip generation — FD/BetMGM data timestamp unknown")
-                auto_generate_slips([])
-                new_slips = []
+            # Auto-generate new slips
+            # Stale check disabled — WebSocket trial until ~Apr 16 2026
+            new_slips = auto_generate_slips(sharp_edges)
         for slip in new_slips:
             if slip["key"] not in alerted_slips:
                 send_slip_alert(slip, data_updated_at=_oddsapi._last_updated_at)
