@@ -72,8 +72,14 @@ def _fetch_pinnacle_props(league_id: int, unit_map: dict) -> list[dict]:
         print(f"  [Pinnacle] Markets fetch failed (league {league_id}): {e}")
         return []
 
+    if not isinstance(markets, list):
+        print(f"  [Pinnacle] Unexpected markets response (league {league_id}): {str(markets)[:200]}")
+        return []
+
     market_lookup = {}
     for mkt in markets:
+        if not isinstance(mkt, dict):
+            continue
         if mkt.get("type") != "total":
             continue
         mid = mkt["matchupId"]
