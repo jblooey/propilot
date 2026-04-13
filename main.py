@@ -224,19 +224,21 @@ def build_sb_props(dk_props, pinnacle_props, oddsapi_props):
     sb = {}
 
     def ensure_player(name):
-        if name not in sb:
-            sb[name] = {"name": name, "props": {}, "anchor": {}}
+        key = normalize_name(name)
+        if key not in sb:
+            sb[key] = {"name": name, "props": {}, "anchor": {}}
+        return key
 
-    def ensure_stat(name, stat):
-        if stat not in sb[name]["props"]:
-            sb[name]["props"][stat] = {}
+    def ensure_stat(key, stat):
+        if stat not in sb[key]["props"]:
+            sb[key]["props"][stat] = {}
 
     for prop in dk_props:
         name = prop["player"]
         stat = LABEL_TO_KEY.get(prop["stat"], prop["stat"])
-        ensure_player(name)
-        ensure_stat(name, stat)
-        sb[name]["props"][stat]["draftkings"] = {
+        key  = ensure_player(name)
+        ensure_stat(key, stat)
+        sb[key]["props"][stat]["draftkings"] = {
             "line":          prop["line"],
             "over_decimal":  prop["over_decimal"],
             "under_decimal": prop["under_decimal"],
@@ -245,9 +247,9 @@ def build_sb_props(dk_props, pinnacle_props, oddsapi_props):
     for prop in pinnacle_props:
         name = prop["player"]
         stat = LABEL_TO_KEY.get(prop["stat"], prop["stat"])
-        ensure_player(name)
-        ensure_stat(name, stat)
-        sb[name]["props"][stat]["pinnacle"] = {
+        key  = ensure_player(name)
+        ensure_stat(key, stat)
+        sb[key]["props"][stat]["pinnacle"] = {
             "line":          prop["line"],
             "over_decimal":  prop["over_decimal"],
             "under_decimal": prop["under_decimal"],
@@ -257,9 +259,9 @@ def build_sb_props(dk_props, pinnacle_props, oddsapi_props):
         name = prop["player"]
         stat = prop["stat"]
         book = prop["bookmaker"]
-        ensure_player(name)
-        ensure_stat(name, stat)
-        sb[name]["props"][stat][book] = {
+        key  = ensure_player(name)
+        ensure_stat(key, stat)
+        sb[key]["props"][stat][book] = {
             "line":          prop["line"],
             "over_decimal":  prop["over_decimal"],
             "under_decimal": prop["under_decimal"],
@@ -269,7 +271,7 @@ def build_sb_props(dk_props, pinnacle_props, oddsapi_props):
         # Also store player_team from SGO roster data so team=null players
         # get their correct team filled in during find_edges.
         if prop.get("home_abbr"):
-            sb[name]["anchor"] = {
+            sb[key]["anchor"] = {
                 "sgo_event_id": prop.get("sgo_event_id", ""),
                 "home_abbr":    prop.get("home_abbr", ""),
                 "away_abbr":    prop.get("away_abbr", ""),
