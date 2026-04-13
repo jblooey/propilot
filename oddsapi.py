@@ -848,18 +848,8 @@ def get_oddsapi_mlb_props() -> list[dict]:
 
 def get_stale_books() -> set[str]:
     """Return set of book names whose data is older than STALE_THRESHOLD_SECS."""
-    # FanDuel NBA temporarily excluded from stale check (WebSocket trial, ~Apr 16 2026)
-    STALE_EXEMPT = {"fanduel"}
-    now_utc = datetime.now(timezone.utc)
-    stale = set()
-    for bk, ts in _book_updated_at.items():
-        if ts is None:
-            continue
-        if bk in STALE_EXEMPT:
-            continue
-        if (now_utc - ts).total_seconds() > STALE_THRESHOLD_SECS:
-            stale.add(bk)
-    return stale
+    # Stale check disabled — WebSocket trial on all accounts until ~Apr 16 2026
+    return set()
 
 
 def build_game_anchors(data=None) -> dict:
