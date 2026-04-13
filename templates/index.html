@@ -199,35 +199,37 @@ body {
 /* Column headers */
 .col-headers {
   display: grid;
-  grid-template-columns: 22px 1fr 140px 110px 80px 80px;
+  grid-template-columns: 20px 1fr 44px 70px 50px 82px 56px 56px 56px 56px 56px 65px;
   padding: 5px 14px;
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0; gap: 8px;
+  flex-shrink: 0; gap: 6px;
   align-items: center;
+  min-width: 860px;
 }
 .ch {
   font-size: 10px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.07em; color: var(--text-4);
 }
-.ch.r { text-align: right; }
+.ch.c { text-align: center; }
 
-.edge-list { overflow-y: auto; flex: 1; padding: 0; }
+.edge-list { overflow-y: auto; overflow-x: auto; flex: 1; padding: 0; }
 .edge-list::-webkit-scrollbar { width: 3px; }
 .edge-list::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
 
 /* ── Edge row ── */
 .edge-row {
   display: grid;
-  grid-template-columns: 22px 1fr 140px 110px 80px 80px;
+  grid-template-columns: 20px 1fr 44px 70px 50px 82px 56px 56px 56px 56px 56px 65px;
   padding: 7px 14px;
   border-bottom: 1px solid var(--border);
   background: transparent;
   cursor: pointer;
   transition: background var(--t);
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   user-select: none;
   position: relative;
+  min-width: 860px;
 }
 .edge-row::before {
   content: ''; position: absolute;
@@ -314,28 +316,31 @@ body {
 .stag    { font-size: 10px; font-weight: 400; color: var(--text-4); }
 .inj-tag { font-size: 9px; font-weight: 600; padding: 1px 4px; border-radius: var(--r-sm); background: var(--amber-dim, rgba(245,158,11,0.10)); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
 
-/* Pick column */
-.c-pick { font-size: 12px; font-weight: 500; color: var(--text-2); line-height: 1.4; }
-.pick-over  { color: var(--accent); font-weight: 600; }
-.pick-under { color: var(--text-2); font-weight: 500; }
+/* O/U column */
+.c-ou { font-size: 12px; font-weight: 600; }
+.pick-over  { color: var(--accent); }
+.pick-under { color: var(--text-3); }
 
-/* Prob column — focal point, no bar */
-.c-prob { display: flex; flex-direction: column; }
-.prob-num {
+/* Stat + Line columns */
+.c-stat { font-size: 11px; font-weight: 600; color: var(--text-2); font-family: 'JetBrains Mono', monospace; }
+.c-line { font-size: 13px; font-weight: 600; color: var(--text-1); font-family: 'JetBrains Mono', monospace; }
+
+/* Prob cell — highlighted block */
+.c-prob-cell {
+  padding: 4px 8px; border-radius: 5px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 24px; font-weight: 700;
-  letter-spacing: -0.5px; line-height: 1;
-  font-variant-numeric: tabular-nums;
+  font-size: 13px; font-weight: 700;
+  text-align: center; font-variant-numeric: tabular-nums;
 }
+.c-prob-cell.prob-green  { background: rgba(34,197,94,0.18);  color: #4ade80; border: 1px solid rgba(34,197,94,0.32); }
+.c-prob-cell.prob-neutral{ background: rgba(113,113,122,0.12); color: var(--text-3); border: 1px solid var(--border); }
+.c-prob-cell.prob-red    { background: rgba(239,68,68,0.12);   color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
 
-/* Edge column */
-.c-edge { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; text-align: right; }
-.c-edge.pos { color: var(--green); }
-.c-edge.dim { color: var(--text-4); }
-
-/* Books column */
-.c-books { display: flex; align-items: center; justify-content: flex-end; }
-.c-books-text { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-4); text-align: right; }
+/* Book line cells */
+.c-bk { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; color: var(--text-2); text-align: center; }
+.c-bk.na { color: var(--text-4); font-size: 11px; }
+.c-ref { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; text-align: center; color: var(--text-2); }
+.c-ref.na { color: var(--text-4); font-size: 11px; }
 
 /* Book detail items */
 .detail-book {
@@ -971,23 +976,24 @@ body {
         <span class="downtime-notice" id="downtimeNotice" style="display:none">&#9790; Data dormant 12–10 AM</span>
         <span class="book-freshness" id="bookFreshness"></span>
       </div>
-      <div class="edge-mode-toggle">
-        <button class="em-btn on" id="emRecommended" onclick="setEdgeMode('recommended')">Recommended</button>
-        <button class="em-btn"    id="emAll"          onclick="setEdgeMode('all')">All Edges</button>
-      </div>
       <div class="filter-tabs">
-        <button class="ftab on" id="fAll" onclick="setFilter('all')">All</button>
-        <button class="ftab"    id="fPP"  onclick="setFilter('PP')">PrizePicks</button>
-        <button class="ftab"    id="fUD"  onclick="setFilter('UD')">Underdog</button>
+        <button class="ftab pp-on" id="fPP" onclick="setFilter('PP')">PrizePicks</button>
+        <button class="ftab"       id="fUD" onclick="setFilter('UD')">Underdog</button>
       </div>
     </div>
     <div class="col-headers">
       <div class="ch"></div>
       <div class="ch">Player</div>
-      <div class="ch">Pick</div>
-      <div class="ch">Prob</div>
-      <div class="ch r">Edge</div>
-      <div class="ch r">Books</div>
+      <div class="ch">O/U</div>
+      <div class="ch">Stat</div>
+      <div class="ch">Line</div>
+      <div class="ch c">Prob %</div>
+      <div class="ch c">FD</div>
+      <div class="ch c">DK</div>
+      <div class="ch c">PIN</div>
+      <div class="ch c">MGM</div>
+      <div class="ch c">CAE</div>
+      <div class="ch c" id="refHeader">UD</div>
     </div>
     <div class="edge-list" id="edgeList">
       <div class="loading"><div class="spin"></div> Loading edges...</div>
@@ -1070,8 +1076,8 @@ body {
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
 let allEdges    = [];
-let filter      = 'all';
-let edgeMode    = 'recommended'; // 'recommended' | 'all'
+let filter      = 'PP';
+let edgeMode    = 'recommended';
 let selected    = [];
 let selectedMode = null; // 'power'/'flex' for PP, 'standard'/'flex' for UD
 let slipTab     = 'active';
@@ -1147,9 +1153,10 @@ function toast(msg, isError = false) {
 
 function setFilter(f) {
   filter = f;
-  document.getElementById('fAll').className = 'ftab' + (f === 'all' ? ' on' : '');
-  document.getElementById('fPP').className  = 'ftab' + (f === 'PP'  ? ' pp-on' : '');
-  document.getElementById('fUD').className  = 'ftab' + (f === 'UD'  ? ' ud-on' : '');
+  document.getElementById('fPP').className = 'ftab' + (f === 'PP' ? ' pp-on' : '');
+  document.getElementById('fUD').className = 'ftab' + (f === 'UD' ? ' ud-on' : '');
+  const refHeader = document.getElementById('refHeader');
+  if (refHeader) refHeader.textContent = f === 'PP' ? 'UD' : 'PP';
   renderEdges();
 }
 
@@ -1243,36 +1250,33 @@ function clearAll() {
 
 // ── Edge count ─────────────────────────────────────────────────────────────
 function updateEdgeCount() {
-  const visible = edgeMode === 'recommended' ? allEdges.filter(e => e.has_sharp !== false) : allEdges;
+  const visible = allEdges.filter(e => e.has_sharp !== false);
   const pp = visible.filter(e => e.platform === 'PP').length;
   const ud = visible.filter(e => e.platform === 'UD').length;
   document.getElementById('edgeCount').textContent =
     `${visible.length} edge${visible.length !== 1 ? 's' : ''} · ${pp} PP · ${ud} UD`;
 }
 
-// ── Edge mode toggle ───────────────────────────────────────────────────────
-function setEdgeMode(mode) {
-  edgeMode = mode;
-  document.getElementById('emRecommended').className = 'em-btn' + (mode === 'recommended' ? ' on' : '');
-  document.getElementById('emAll').className         = 'em-btn' + (mode === 'all'         ? ' on' : '');
-  renderEdges();
+// ── Render edges ───────────────────────────────────────────────────────────
+function lineOnly(val) {
+  if (!val || val === '-') return null;
+  return val.split('/')[0];
 }
 
-// ── Render edges ───────────────────────────────────────────────────────────
 function renderEdges() {
   updateEdgeCount();
-  const locked  = lockedPlatform();
-  let edges = edgeMode === 'recommended'
-    ? allEdges.filter(e => e.has_sharp !== false)
-    : allEdges;
+  const locked = lockedPlatform();
+  let edges = allEdges.filter(e => e.has_sharp !== false);
   if (filter !== 'all') edges = edges.filter(e => e.platform === filter);
-  const sorted  = [...edges].sort((a, b) => b.prob - a.prob);
-  const el      = document.getElementById('edgeList');
+  const sorted = [...edges].sort((a, b) => b.prob - a.prob);
+  const el = document.getElementById('edgeList');
 
   if (!sorted.length) {
     el.innerHTML = '<div class="empty"><div class="e-title">No edges right now</div><div class="e-sub">Check back closer to tip-off</div></div>';
     return;
   }
+
+  const refKey  = filter === 'UD' ? 'prizepicks' : 'underdog';
 
   el.innerHTML = sorted.map(e => {
     const isSelected = selected.some(s => s.player === e.player && s.stat === e.stat && s.direction === e.direction && s.platform === e.platform);
@@ -1282,33 +1286,21 @@ function renderEdges() {
     const dirWord   = e.direction === 'OVER' ? 'Over' : 'Under';
     const dirClass  = e.direction === 'OVER' ? 'pick-over' : 'pick-under';
     const pClass    = probClass(e.prob, e.platform);
-    const edge      = e.prob - 52.38;
-    const edgeStr   = edge >= 0 ? `+${edge.toFixed(1)}%` : `${edge.toFixed(1)}%`;
-    const edgeClass = edge >= 2 ? 'c-edge pos' : 'c-edge dim';
 
-    const books = [];
-    if (e.pin !== '-') books.push('PIN');
-    if (e.fd  !== '-') books.push('FD');
-    if (e.dk  !== '-') books.push('DK');
-    if (e.mgm !== '-') books.push('MGM');
-    if (e.cae !== '-') books.push('CAE');
+    const fd  = lineOnly(e.fd);
+    const dk  = lineOnly(e.dk);
+    const pin = lineOnly(e.pin);
+    const mgm = lineOnly(e.mgm);
+    const cae = lineOnly(e.cae);
+    const ref = lineOnly(e[refKey]);
 
-    const injHtml  = e.injury_status ? `<span class="inj-tag">${e.injury_status.toUpperCase()}</span>` : '';
-    const starHtml = e.star_risk ? `<span class="inj-tag">${e.star_risk.split(' ')[1] || e.star_risk}</span>` : '';
+    const bk = (val) => val ? `<div class="c-bk">${val}</div>` : `<div class="c-bk na">—</div>`;
+    const injHtml = e.injury_status ? `<span class="inj-tag">${e.injury_status.toUpperCase()}</span>` : '';
+    const sub = [e.matchup, e.team].filter(Boolean).join(' · ');
 
-    const refBookKey  = e.platform === 'PP' ? 'underdog' : 'prizepicks';
-    const refBookName = e.platform === 'PP' ? 'Underdog' : 'PrizePicks';
-    const bookMap = {'Pinnacle':e.pin,'FanDuel':e.fd,'DraftKings':e.dk,'BetMGM':e.mgm,'Caesars':e.cae,[refBookName]:e[refBookKey]};
-    const bookDetails = Object.entries(bookMap)
-      .filter(([,v]) => v && v !== '-')
-      .map(([name, val]) => {
-        const parts = val.split('/');
-        return `<div class="detail-book"><div class="db-name">${name}</div><div class="db-line">${parts[0]}</div><div class="db-odds">${parts[1]||''}</div></div>`;
-      }).join('');
-    const noSharp = edgeMode === 'all' && e.has_sharp === false;
-    const classes = ['edge-row', e.platform.toLowerCase(), isSelected ? 'selected' : '', isDimmed ? 'dimmed' : '', noSharp ? 'no-sharp' : ''].filter(Boolean).join(' ');
+    const classes = ['edge-row', e.platform.toLowerCase(), isSelected ? 'selected' : '', isDimmed ? 'dimmed' : ''].filter(Boolean).join(' ');
 
-    return `<div class="${classes}" onclick="handleCardClick(event, ${JSON.stringify(e).replace(/"/g, '&quot;')})">
+    return `<div class="${classes}" onclick="toggleSelect(${JSON.stringify(e).replace(/"/g, '&quot;')})">
       <div class="c-check">
         <svg class="check-mark" width="9" height="7" viewBox="0 0 9 7" fill="none">
           <path d="M1 3.5L3 5.5L8 1" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1316,34 +1308,16 @@ function renderEdges() {
       </div>
       <div class="c-player">
         <div class="c-player-name">${e.player}</div>
-        <div class="c-player-tags">
-          <span class="ptag ${e.platform.toLowerCase()}">${e.platform}</span>
-          <span class="stag">${statLabel}${e.team ? ` · ${e.team}` : ''}</span>
-          ${injHtml}${starHtml}
-        </div>
+        <div class="c-player-tags"><span class="stag">${sub}</span>${injHtml}</div>
       </div>
-      <div><div class="c-pick"><span class="${dirClass}">${dirWord}</span> ${e.platform_line} ${statLabel}</div></div>
-      <div class="c-prob">
-        <span class="prob-num ${pClass}">${e.prob}%</span>
-      </div>
-      <div class="${edgeClass}">${edgeStr}</div>
-      <div class="c-books"><button class="view-lines-btn" onclick="event.stopPropagation(); this.closest('.edge-row').classList.toggle('expanded')">View Lines</button></div>
-      <div class="edge-detail">${bookDetails}</div>
+      <div class="c-ou"><span class="${dirClass}">${dirWord}</span></div>
+      <div class="c-stat">${statLabel}</div>
+      <div class="c-line">${e.platform_line}</div>
+      <div class="c-prob-cell ${pClass}">${e.prob}%</div>
+      ${bk(fd)}${bk(dk)}${bk(pin)}${bk(mgm)}${bk(cae)}
+      ${ref ? `<div class="c-ref">${ref}</div>` : `<div class="c-ref na">—</div>`}
     </div>`;
   }).join('');
-}
-
-function handleCardClick(event, edge) {
-  const card    = event.currentTarget;
-  const check   = card.querySelector('.c-check');
-  const clicked = event.target;
-
-  const inCheckbox = check && (check === clicked || check.contains(clicked));
-
-  if (inCheckbox || clicked.closest('.c-player') || clicked.closest('.c-pick') ||
-      clicked.closest('.c-prob') || clicked.closest('.c-edge')) {
-    toggleSelect(edge);
-  }
 }
 
 // ── Render builder ─────────────────────────────────────────────────────────
