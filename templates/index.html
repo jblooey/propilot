@@ -186,6 +186,18 @@ body {
 .ftab.ud-on { color: #fbbf24; background: rgba(217,119,6,0.10);  border: 1px solid rgba(217,119,6,0.35); }
 .ftab#fPP:not(.pp-on):hover { color: #a78bfa; }
 .ftab#fUD:not(.ud-on):hover { color: #fbbf24; }
+.all-toggle {
+  font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: var(--r-sm);
+  border: 1px solid var(--border-2);
+  background: transparent; color: var(--text-3);
+  cursor: pointer; transition: all var(--t);
+}
+.all-toggle:hover { color: var(--red); border-color: rgba(239,68,68,0.4); }
+.all-toggle.on {
+  color: var(--red); background: rgba(239,68,68,0.10);
+  border-color: rgba(239,68,68,0.45);
+}
 .edge-mode-toggle { display: flex; gap: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 2px; }
 .em-btn {
   font-size: 11px; font-weight: 500;
@@ -978,9 +990,12 @@ body {
         <span class="downtime-notice" id="downtimeNotice" style="display:none">&#9790; Data dormant 12–10 AM</span>
         <span class="book-freshness" id="bookFreshness"></span>
       </div>
-      <div class="filter-tabs">
-        <button class="ftab pp-on" id="fPP" onclick="setFilter('PP')">PrizePicks</button>
-        <button class="ftab"       id="fUD" onclick="setFilter('UD')">Underdog</button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="all-toggle" id="allToggle" onclick="toggleAllEdges()">Show All</button>
+        <div class="filter-tabs">
+          <button class="ftab pp-on" id="fPP" onclick="setFilter('PP')">PrizePicks</button>
+          <button class="ftab"       id="fUD" onclick="setFilter('UD')">Underdog</button>
+        </div>
       </div>
     </div>
     <div class="col-headers">
@@ -1079,7 +1094,7 @@ body {
 // ── State ──────────────────────────────────────────────────────────────────
 let allEdges    = [];
 let filter      = 'PP';
-let edgeMode    = 'recommended';
+let edgeMode    = 'recommended'; // 'recommended' | 'all'
 let selected    = [];
 let selectedMode = null; // 'power'/'flex' for PP, 'standard'/'flex' for UD
 let slipTab     = 'active';
@@ -1158,6 +1173,14 @@ function toast(msg, isError = false) {
   el.textContent = msg;
   el.className   = 'toast show' + (isError ? ' error' : '');
   setTimeout(() => el.className = 'toast', 2500);
+}
+
+function toggleAllEdges() {
+  edgeMode = edgeMode === 'recommended' ? 'all' : 'recommended';
+  const btn = document.getElementById('allToggle');
+  btn.className  = 'all-toggle' + (edgeMode === 'all' ? ' on' : '');
+  btn.textContent = edgeMode === 'all' ? 'Recommended Only' : 'Show All';
+  renderEdges();
 }
 
 function setFilter(f) {
@@ -1276,7 +1299,7 @@ function parseBk(val) {
 function renderEdges() {
   updateEdgeCount();
   const locked = lockedPlatform();
-  let edges = allEdges.filter(e => e.has_sharp !== false);
+  let edges = edgeMode === 'recommended' ? allEdges.filter(e => e.has_sharp !== false) : allEdges;
   if (filter !== 'all') edges = edges.filter(e => e.platform === filter);
   const sorted = [...edges].sort((a, b) => b.prob - a.prob);
   const el = document.getElementById('edgeList');
