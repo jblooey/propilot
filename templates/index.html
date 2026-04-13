@@ -1635,16 +1635,9 @@ async function fetchEdges() {
     const bookLabels = { fanduel: 'FD', betmgm: 'MGM', draftkings: 'DK', caesars: 'CAE' };
     const freshnessEl = document.getElementById('bookFreshness');
     if (freshnessEl && Object.keys(bookAges).length) {
-      const pills = [`<span class="bf-pill" title="Pinnacle data age">PIN 0s</span>`];
-      Object.entries(bookLabels).forEach(([key, label]) => {
-        const age = bookAges[key];
-        if (age == null) return;
-        const mins = Math.floor(age / 60);
-        const secs = age % 60;
-        const ageStr = mins > 0 ? `${mins}m${secs}s` : `${secs}s`;
-        const isStale = staleBooks.has(key);
-        pills.push(`<span class="bf-pill${isStale ? ' stale' : ''}" title="${label} data age">${label} ${ageStr}${isStale ? ' ⚠' : ''}</span>`);
-      });
+      const pills = ['PIN', 'FD', 'DK', 'MGM', 'CAE'].map(label =>
+        `<span class="bf-pill">${label}</span>`
+      );
       freshnessEl.innerHTML = pills.join('');
     }
 
