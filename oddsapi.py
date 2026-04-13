@@ -39,7 +39,7 @@ _book_updated_at = {
     "caesars":    None,
 }
 
-STALE_THRESHOLD_SECS = 300  # 5 minutes
+STALE_THRESHOLD_SECS = 999999  # disabled — WebSocket trial until ~Apr 16 2026
 
 # ── Team name → ESPN abbreviation ─────────────────────────────────────────────
 # odds-api.io returns full team names e.g. "Indiana Pacers"
