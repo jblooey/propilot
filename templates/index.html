@@ -337,10 +337,12 @@ body {
 .c-prob-cell.prob-red    { background: rgba(239,68,68,0.12);   color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
 
 /* Book line cells */
-.c-bk { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; color: var(--text-2); text-align: center; }
-.c-bk.na { color: var(--text-4); font-size: 11px; }
-.c-ref { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; text-align: center; color: var(--text-2); }
-.c-ref.na { color: var(--text-4); font-size: 11px; }
+.c-bk { font-family: 'JetBrains Mono', monospace; text-align: center; display: flex; flex-direction: column; gap: 1px; }
+.c-bk.na { color: var(--text-4); font-size: 11px; align-items: center; justify-content: center; }
+.c-ref { font-family: 'JetBrains Mono', monospace; text-align: center; display: flex; flex-direction: column; gap: 1px; }
+.c-ref.na { color: var(--text-4); font-size: 11px; align-items: center; justify-content: center; }
+.bk-line { font-size: 12px; font-weight: 600; color: var(--text-1); }
+.bk-odds { font-size: 10px; font-weight: 400; color: var(--text-3); }
 
 /* Book detail items */
 .detail-book {
@@ -1265,9 +1267,10 @@ function updateEdgeCount() {
 }
 
 // ── Render edges ───────────────────────────────────────────────────────────
-function lineOnly(val) {
+function parseBk(val) {
   if (!val || val === '-') return null;
-  return val.split('/')[0];
+  const parts = val.split('/');
+  return { line: parts[0], odds: parts[1] || null };
 }
 
 function renderEdges() {
@@ -1294,14 +1297,16 @@ function renderEdges() {
     const dirClass  = e.direction === 'OVER' ? 'pick-over' : 'pick-under';
     const pClass    = probClass(e.prob, e.platform);
 
-    const fd  = lineOnly(e.fd);
-    const dk  = lineOnly(e.dk);
-    const pin = lineOnly(e.pin);
-    const mgm = lineOnly(e.mgm);
-    const cae = lineOnly(e.cae);
-    const ref = lineOnly(e[refKey]);
+    const fd  = parseBk(e.fd);
+    const dk  = parseBk(e.dk);
+    const pin = parseBk(e.pin);
+    const mgm = parseBk(e.mgm);
+    const cae = parseBk(e.cae);
+    const ref = parseBk(e[refKey]);
 
-    const bk = (val) => val ? `<div class="c-bk">${val}</div>` : `<div class="c-bk na">—</div>`;
+    const bk = (b) => b
+      ? `<div class="c-bk"><div class="bk-line">${b.line}</div>${b.odds ? `<div class="bk-odds">${b.odds}</div>` : ''}</div>`
+      : `<div class="c-bk na">—</div>`;
     const injHtml = e.injury_status ? `<span class="inj-tag">${e.injury_status.toUpperCase()}</span>` : '';
     const sub = [e.matchup, e.team].filter(Boolean).join(' · ');
 
@@ -1322,7 +1327,7 @@ function renderEdges() {
       <div class="c-line">${e.platform_line}</div>
       <div class="c-prob-cell ${pClass}">${e.prob}%</div>
       ${bk(fd)}${bk(dk)}${bk(pin)}${bk(mgm)}${bk(cae)}
-      ${ref ? `<div class="c-ref">${ref}</div>` : `<div class="c-ref na">—</div>`}
+      ${ref ? `<div class="c-ref"><div class="bk-line">${ref.line}</div>${ref.odds ? `<div class="bk-odds">${ref.odds}</div>` : ''}</div>` : `<div class="c-ref na">—</div>`}
     </div>`;
   }).join('');
 }
