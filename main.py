@@ -98,6 +98,9 @@ WHOLE_NUMBER_THRESHOLD_BUMP = 0.01
 # ── Utility ───────────────────────────────────────────────────────────────────
 
 def normalize_name(name):
+    import unicodedata
+    name = unicodedata.normalize("NFD", name)
+    name = "".join(c for c in name if unicodedata.category(c) != "Mn")
     return name.lower().replace(".", "").replace("'", "").replace("-", " ").strip()
 
 
