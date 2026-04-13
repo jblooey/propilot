@@ -524,6 +524,8 @@ def get_oddsapi_props(wait_for_refresh=False) -> list[dict]:
 
     if not upcoming:
         print("  [OddsAPI] No games in the next 24 hours")
+        global _last_updated_at
+        _last_updated_at = datetime.now(timezone.utc)
         return []
 
     print(f"  [OddsAPI] Fetching props for {len(upcoming)} game(s) "
