@@ -199,7 +199,7 @@ body {
 /* Column headers */
 .col-headers {
   display: grid;
-  grid-template-columns: 20px 1fr 44px 70px 50px 82px 56px 56px 56px 56px 56px 65px;
+  grid-template-columns: 20px 1fr 44px 110px 50px 82px 56px 56px 56px 56px 56px 65px;
   padding: 5px 14px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0; gap: 6px;
@@ -219,7 +219,7 @@ body {
 /* ── Edge row ── */
 .edge-row {
   display: grid;
-  grid-template-columns: 20px 1fr 44px 70px 50px 82px 56px 56px 56px 56px 56px 65px;
+  grid-template-columns: 20px 1fr 44px 110px 50px 82px 56px 56px 56px 56px 56px 65px;
   padding: 7px 14px;
   border-bottom: 1px solid var(--border);
   background: transparent;
@@ -322,7 +322,7 @@ body {
 .pick-under { color: var(--text-3); }
 
 /* Stat + Line columns */
-.c-stat { font-size: 11px; font-weight: 600; color: var(--text-2); font-family: 'JetBrains Mono', monospace; }
+.c-stat { font-size: 11px; font-weight: 600; color: var(--text-2); font-family: 'JetBrains Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .c-line { font-size: 13px; font-weight: 600; color: var(--text-1); font-family: 'JetBrains Mono', monospace; }
 
 /* Prob cell — highlighted block */
@@ -1086,7 +1086,14 @@ let lastUpdate = null;
 
 const STAT_LABELS = {
   points: 'PTS', rebounds: 'REB', assists: 'AST', threes: '3PM',
-  pra: 'P+R+A', pr: 'P+R', pa: 'P+A', ra: 'R+A'
+  pra: 'P+R+A', pr: 'P+R', pa: 'P+A', ra: 'R+A',
+  hits: 'Hits', rbis: 'RBIs', home_runs: 'Home Runs', total_bases: 'Total Bases',
+  runs: 'Runs', batter_strikeouts: 'Batter Ks', stolen_bases: 'Stolen Bases',
+  singles: 'Singles', doubles: 'Doubles', triples: 'Triples',
+  hits_runs_rbis: 'H+R+RBI', walks: 'Walks',
+  pitcher_strikeouts: 'Pitcher Ks', pitching_outs: 'Pitching Outs',
+  hits_allowed: 'Hits Allowed', earned_runs: 'Earned Runs',
+  walks_allowed: 'Walks Allowed', pitches_thrown: 'Pitches',
 };
 
 const PP_POWER_MULT = { '2-pick':3.0, '3-pick':6.0, '4-pick':10.0, '5-pick':20.0, '6-pick':37.5 };
