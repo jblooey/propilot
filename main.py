@@ -464,7 +464,6 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
             stat_data = {k: v for k, v in stat_data.items() if k not in stale_books}
 
         sb_only = {k: v for k, v in stat_data.items() if k in SPORTSBOOKS}
-        has_fd  = "fanduel" in sb_only
         n_books = len(sb_only)
 
         # Look up ref line early so we can use it below
@@ -500,10 +499,8 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
         ref_disagrees = _ref is not None and abs(_ref - platform_line) >= 0.5
         effective_n_books = n_books + (1 if ref_disagrees else 0)
 
-        # has_sharp = recommended:
-        #   (a) FanDuel present + at least 1 other source (book or disagreeing ref), OR
-        #   (b) 3+ sources total
-        has_sharp = (has_fd and effective_n_books >= 2) or (effective_n_books >= 3)
+        # has_sharp = recommended: 2+ sources total (books or disagreeing ref)
+        has_sharp = effective_n_books >= 2
 
         # Need at least one source (sportsbook or ref platform) to form a consensus.
         # If only the ref platform is available, has_sharp stays False → "All" only.
