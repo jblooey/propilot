@@ -205,8 +205,8 @@ def run():
         ud_nba_flat = ud_props
         ud_mlb_flat = ud_mlb_props
 
-        # NBA sb_props — existing pipeline (DK + Pinnacle NBA + oddsapi NBA)
-        sb_props = build_sb_props(dk_props, pinnacle_props, oddsapi_props)
+        # NBA sb_props — Pinnacle NBA + oddsapi NBA (FD/MGM/DK/CAE)
+        sb_props = build_sb_props([], pinnacle_props, oddsapi_props)
 
         # MLB sb_props — Pinnacle MLB + oddsapi MLB (no DK scraper for MLB yet)
         sb_mlb_props = build_sb_props([], pin_mlb_props, oddsapi_mlb_props)
