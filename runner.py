@@ -10,7 +10,6 @@ load_dotenv()
 
 from prizepicks import get_prizepicks_nba as get_prizepicks_props, get_prizepicks_mlb
 from underdog import get_ud_props, get_ud_mlb_props
-from draftkings import get_dk_props
 from pinnacle import get_pinnacle_props, get_pinnacle_mlb_props
 import oddsapi as _oddsapi
 from oddsapi import get_oddsapi_props, get_oddsapi_mlb_props
@@ -150,19 +149,15 @@ def run():
     sb_props    = {}
 
     try:
-        print("Fetching DraftKings...")
-        dk_props = get_dk_props()
-        print(f"  {len(dk_props)} props")
-
         print("Fetching Pinnacle...")
         pinnacle_props = get_pinnacle_props()
         print(f"  {len(pinnacle_props)} props")
 
-        print("Fetching FanDuel + BetMGM...")
+        print("Fetching FanDuel + BetMGM + DraftKings + Caesars...")
         oddsapi_props = get_oddsapi_props()
         print(f"  {len(oddsapi_props)} props")
 
-        sb_props        = build_sb_props(dk_props, pinnacle_props, oddsapi_props)
+        sb_props        = build_sb_props([], pinnacle_props, oddsapi_props)
         player_team_map = build_player_team_map()
 
         print("Fetching PrizePicks NBA...")

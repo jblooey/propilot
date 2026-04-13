@@ -511,13 +511,13 @@ def get_oddsapi_props(wait_for_refresh=False) -> list[dict]:
         print("  [OddsAPI] No NBA events found")
         return []
 
-    # Filter to only games starting within the next 24 hours
+    # Filter to games starting within the next 48 hours (or up to 3h ago for in-progress)
     now = datetime.now(timezone.utc)
     upcoming = []
     for e in events:
         try:
             game_time = datetime.fromisoformat(e["date"].replace("Z", "+00:00"))
-            if now - timedelta(hours=3) <= game_time <= now + timedelta(hours=24):
+            if now - timedelta(hours=3) <= game_time <= now + timedelta(hours=48):
                 upcoming.append(e)
         except Exception:
             pass
