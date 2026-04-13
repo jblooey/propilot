@@ -1,4 +1,5 @@
 import requests
+from datetime import datetime, timezone
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
@@ -46,11 +47,17 @@ def _fetch_pinnacle_props(league_id: int, unit_map: dict) -> list[dict]:
         print(f"  [Pinnacle] Matchups fetch failed (league {league_id}): {e}")
         return []
 
+    now = datetime.now(timezone.utc)
     prop_matchups = [
         m for m in matchups
         if isinstance(m, dict)
         and m.get("special", {}).get("category") == "Player Props"
         and m.get("units") in unit_map
+        and any(
+            datetime.fromisoformat(p["cutoffAt"].replace("Z", "+00:00")) > now
+            for p in m.get("periods", [])
+            if p.get("cutoffAt")
+        )
     ]
 
     if not prop_matchups:
