@@ -89,6 +89,9 @@ STAT_LABEL_MAP = {
     "three pointers made":      "threes",
     "3-pointers made":          "threes",
     "3 pointers made":          "threes",
+    "3 point fg":               "threes",
+    "3-point fg":               "threes",
+    "3pt fg":                   "threes",
     "pts+reb+ast":              "pra",
     "points+rebounds+assists":  "pra",
     "pts+reb":                  "pr",
@@ -218,11 +221,13 @@ def _decimal_to_american(dec_str: str) -> str | None:
     """Convert decimal odds string '1.90' to American odds string '-111'."""
     try:
         dec = float(dec_str)
+        if dec <= 1.0:
+            return None
         if dec >= 2.0:
             return f"+{round((dec - 1) * 100)}"
         else:
             return str(round(-100 / (dec - 1)))
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, ZeroDivisionError):
         return None
 
 
@@ -511,24 +516,29 @@ def get_oddsapi_props(wait_for_refresh=False) -> list[dict]:
         print("  [OddsAPI] No NBA events found")
         return []
 
-    # Filter to games starting within the next 48 hours (or up to 3h ago for in-progress)
+    # Split events: "imminent" (within 48h) get all 4 books; "future" (2–5 days) get FD only.
+    # This keeps us well within the 100 req/hour rate limit per account.
     now = datetime.now(timezone.utc)
-    upcoming = []
+    imminent, future = [], []
     for e in events:
         try:
             game_time = datetime.fromisoformat(e["date"].replace("Z", "+00:00"))
-            if now - timedelta(hours=3) <= game_time <= now + timedelta(hours=48):
-                upcoming.append(e)
+            delta = game_time - now
+            if timedelta(hours=-3) <= delta - timedelta(0) and delta <= timedelta(hours=48):
+                imminent.append(e)
+            elif timedelta(hours=48) < delta <= timedelta(days=5):
+                future.append(e)
         except Exception:
             pass
 
+    upcoming = imminent + future  # combined for logging
     if not upcoming:
-        print("  [OddsAPI] No games in the next 24 hours")
+        print("  [OddsAPI] No upcoming NBA games found")
         global _last_updated_at
         _last_updated_at = datetime.now(timezone.utc)
         return []
 
-    print(f"  [OddsAPI] Fetching props for {len(upcoming)} game(s) "
+    print(f"  [OddsAPI] Fetching props for {len(imminent)} imminent + {len(future)} future game(s) "
           f"(FD: {_rate_limit_fd['remaining']} req | MGM: {_rate_limit_mgm['remaining']} req | DK: {_rate_limit_dk['remaining']} req | CAE: {_rate_limit_cae['remaining']} req remaining)")
 
     # Step 2: fetch odds per game
@@ -537,9 +547,10 @@ def get_oddsapi_props(wait_for_refresh=False) -> list[dict]:
     games_fetched = 0
 
     for event in upcoming:
-        anchor = None
+        anchor     = None
+        is_future  = event in future  # future games: FD only to save rate limit
 
-        # FanDuel fetch
+        # FanDuel fetch (always)
         fd_data = _fetch_event_odds_fd(event["id"])
         if fd_data:
             anchor = _build_anchor(event, fd_data)
@@ -550,6 +561,9 @@ def get_oddsapi_props(wait_for_refresh=False) -> list[dict]:
             for bk, bts_val in bts.items():
                 if _book_updated_at[bk] is None or bts_val > _book_updated_at[bk]:
                     _book_updated_at[bk] = bts_val
+
+        if is_future:
+            continue  # skip MGM/DK/CAE for future games
 
         # BetMGM fetch
         mgm_data = _fetch_event_odds_mgm(event["id"])

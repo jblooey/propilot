@@ -65,7 +65,8 @@ def stake_for_type(slip_type, unit=BASE_UNIT):
 STAKE_BY_TYPE = {k: round(v * BASE_UNIT, 2) for k, v in STAKE_RATIO_BY_TYPE.items()}
 
 # Minimum EV% floor before a slip is generated
-MIN_EV_PCT = 8.0
+MIN_EV_PCT      = 8.0
+MIN_EV_PCT_TACO = 45.0  # higher bar when a promo/taco leg is in the slip
 
 MAX_PLAYERS_PER_TEAM_GLOBAL    = 3
 MAX_PLAYERS_PER_MATCHUP_GLOBAL = 4
@@ -135,25 +136,35 @@ def _flex_payouts(platform, slip_type):
 def _power_mult(platform, slip_type):
     return PP_POWER_MULT.get(slip_type, 6.0) if platform == "PP" else UD_STANDARD_MULT.get(slip_type, 6.5)
 
-def _calc_flex_ev(platform, slip_type, probs, stake):
+def _leg_mult_factor(leg_mults):
+    """Product of all per-leg payout multipliers (1.0 if none provided)."""
+    if not leg_mults:
+        return 1.0
+    factor = 1.0
+    for m in leg_mults:
+        factor *= (m if m is not None else 1.0)
+    return factor
+
+def _calc_flex_ev(platform, slip_type, probs, stake, mult_factor=1.0):
     from math import comb
     n = _n_picks(slip_type)
     payouts = _flex_payouts(platform, slip_type)
     jp = calc_joint_prob(probs)
     p_avg = jp ** (1 / n)  # geometric mean
     expected = sum(
-        comb(n, hits) * (p_avg ** hits) * ((1 - p_avg) ** (n - hits)) * mult * stake
+        comb(n, hits) * (p_avg ** hits) * ((1 - p_avg) ** (n - hits)) * mult * mult_factor * stake
         for hits, mult in payouts.items()
     )
     ev     = round(expected - stake, 2)
     ev_pct = round((expected - stake) / stake * 100, 1)
     return ev, ev_pct, round(jp * 100, 2)
 
-def calc_ev(platform, slip_type, probs, stake):
+def calc_ev(platform, slip_type, probs, stake, leg_mults=None):
+    mult_factor = _leg_mult_factor(leg_mults)
     if _is_flex(slip_type):
-        return _calc_flex_ev(platform, slip_type, probs, stake)
+        return _calc_flex_ev(platform, slip_type, probs, stake, mult_factor)
     jp     = calc_joint_prob(probs)
-    mult   = _power_mult(platform, slip_type)
+    mult   = _power_mult(platform, slip_type) * mult_factor
     payout = jp * stake * mult
     ev     = round(payout - stake, 2)
     ev_pct = round((payout - stake) / stake * 100, 1)
@@ -161,9 +172,10 @@ def calc_ev(platform, slip_type, probs, stake):
 
 
 def _payout_for_result(slip, result):
-    stake     = slip["stake"]
-    platform  = slip["platform"]
-    slip_type = slip["type"]
+    stake       = slip["stake"]
+    platform    = slip["platform"]
+    slip_type   = slip["type"]
+    mult_factor = _leg_mult_factor(slip.get("leg_mults"))
 
     if result == "refund":
         return stake, 0.0
@@ -182,7 +194,7 @@ def _payout_for_result(slip, result):
             k    = int(result.split("-")[1])
             mult = _power_mult(platform, f"{k}-pick")
 
-    payout = round(stake * mult, 2)
+    payout = round(stake * mult * mult_factor, 2)
     profit = round(payout - stake, 2)
     return payout, profit
 
@@ -203,18 +215,7 @@ def auto_generate_slips(current_edges):
     # Only generate slips for today's games (ET).
     # Sportsbooks post tomorrow's lines overnight — this prevents the system from
     # locking in slips for next-day games before the market has priced them accurately.
-    _now_utc  = datetime.now(timezone.utc)
-    _et_offset = -4 if 3 <= _now_utc.month <= 11 else -5
-    _today_et = (_now_utc.hour + _et_offset) % 24
-    # If it's before 5 AM ET, "today" for game purposes is still yesterday's slate
-    _et_date  = _now_utc.date() if _today_et >= 5 else (_now_utc.date() - __import__('datetime').timedelta(days=1))
-    today_str = _et_date.isoformat()
-
-    before = len(current_edges)
-    current_edges = [e for e in current_edges if e.get("game_date") == today_str]
-    filtered = before - len(current_edges)
-    if filtered:
-        print(f"  [SLIP] Filtered {filtered} edge(s) for non-today game_date (today ET = {today_str})")
+    # No date filter — generate slips for all upcoming games
 
     slips = load_slips()
 
@@ -275,26 +276,70 @@ def auto_generate_slips(current_edges):
             if mk:
                 committed_matchup_counts[mk] = committed_matchup_counts.get(mk, 0) + len(s["players"])
 
-        best_edge_per_player = {}
+        # Build two pools:
+        # flat_pool  — one flat edge per player (highest prob), no multipliers
+        # mult_pool  — one multiplier edge per player (highest EV-adjusted prob)
+        # Taco (promo) edges are allowed but tracked separately for EV gating.
+        TOP_POOL = 25
+
+        best_flat_per_player = {}
+        best_mult_per_player = {}
         for e in platform_edges:
-            player = e["player"].lower()
-            if player not in best_edge_per_player or e["prob"] > best_edge_per_player[player]["prob"]:
-                best_edge_per_player[player] = e
-        deduped_edges = list(best_edge_per_player.values())
+            pkey = e["player"].lower()
+            is_mult = platform == "UD" and e.get("ud_mult", 1.0) != 1.0
+            if is_mult:
+                existing = best_mult_per_player.get(pkey)
+                if existing is None or e["prob"] > existing["prob"]:
+                    best_mult_per_player[pkey] = e
+            else:
+                existing = best_flat_per_player.get(pkey)
+                if existing is None or e["prob"] > existing["prob"]:
+                    best_flat_per_player[pkey] = e
+
+        # Separate taco (promo) edges from flat pool — tracked for EV gating
+        flat_pool = sorted(
+            [e for e in best_flat_per_player.values() if not e.get("is_promo")],
+            key=lambda e: e["prob"], reverse=True
+        )[:TOP_POOL]
+        taco_pool = sorted(
+            [e for e in best_flat_per_player.values() if e.get("is_promo")],
+            key=lambda e: e["prob"], reverse=True
+        )[:5]  # tacos are rare, cap at 5
+
+        # Mult pool: one mult edge per player not already in flat_pool
+        mult_pool = sorted(
+            best_mult_per_player.values(),
+            key=lambda e: e["prob"], reverse=True
+        )[:10]
 
         candidate_slips = []
 
-        for slip_type in AUTOPILOT_SLIP_TYPES[platform]:
+        def _build_combos(slip_type, base_pool, extra_leg=None):
+            """
+            Generate all valid combos of size n from base_pool,
+            optionally forcing extra_leg as one of the legs.
+            extra_leg is a single edge dict (mult or taco).
+            """
             n = _n_picks(slip_type)
-            if len(deduped_edges) < n:
-                continue
-
             min_10 = AUTOPILOT_MIN_AVG_PROB[platform][slip_type] * 100
 
-            for combo in combinations(deduped_edges, n):
+            if extra_leg is not None:
+                # Force extra_leg as one leg, pick (n-1) from base_pool
+                # excluding any player already covered by extra_leg
+                sub_pool = [e for e in base_pool if e["player"].lower() != extra_leg["player"].lower()]
+                if len(sub_pool) < n - 1:
+                    return
+                pick_from = combinations(sub_pool, n - 1)
+                combos = (tuple(flat_legs) + (extra_leg,) for flat_legs in pick_from)
+            else:
+                if len(base_pool) < n:
+                    return
+                combos = combinations(base_pool, n)
+
+            for combo in combos:
                 players     = [e["player"] for e in combo]
                 player_keys = [p.lower() for p in players]
-                teams = [e.get("team") or None for e in combo]
+                teams       = [e.get("team") or None for e in combo]
 
                 if any(p in committed_players for p in player_keys):
                     continue
@@ -324,17 +369,14 @@ def auto_generate_slips(current_edges):
                     else:
                         matchup_keys.append(None)
 
-                # Block any combo with 2+ players from the same matchup (even opposing teams)
                 same_matchup_players = {}
                 for idx_e, mk in enumerate(matchup_keys):
                     if mk is None:
                         continue
                     same_matchup_players.setdefault(mk, []).append(idx_e)
-
                 if any(len(idxs) >= 2 for idxs in same_matchup_players.values()):
                     continue
 
-                # Global matchup exposure check
                 combo_mk_counts = {}
                 for e in combo:
                     h = e.get("home_abbr", "")
@@ -345,6 +387,12 @@ def auto_generate_slips(current_edges):
                 if any(committed_matchup_counts.get(mk, 0) + cnt > MAX_PLAYERS_PER_MATCHUP_GLOBAL
                        for mk, cnt in combo_mk_counts.items()):
                     continue
+
+                # Max 1 multiplier leg per slip
+                if platform == "UD":
+                    mult_legs = sum(1 for e in combo if e.get("ud_mult", 1.0) != 1.0)
+                    if mult_legs > 1:
+                        continue
 
                 combo_bets = [{
                     "player":    e["player"],
@@ -361,14 +409,17 @@ def auto_generate_slips(current_edges):
                 if avg_prob < min_10:
                     continue
 
-                stake              = stake_for_type(slip_type)
-                ev, ev_pct, joint_prob = calc_ev(platform, slip_type, probs, stake)
+                stake     = stake_for_type(slip_type)
+                leg_mults = [e.get("ud_mult", 1.0) for e in combo] if platform == "UD" else None
+                ev, ev_pct, joint_prob = calc_ev(platform, slip_type, probs, stake, leg_mults=leg_mults)
 
-                if ev_pct < MIN_EV_PCT:
+                has_taco = any(e.get("is_promo") for e in combo)
+                min_ev = MIN_EV_PCT_TACO if has_taco else MIN_EV_PCT
+                if ev_pct < min_ev:
                     continue
 
-                key = f"{platform}:{','.join(sorted([e['player'].lower()+e['stat']+e['direction'] for e in combo]))}"
-                if key in existing_keys:
+                ckey = f"{platform}:{','.join(sorted([e['player'].lower()+e['stat']+e['direction'] for e in combo]))}"
+                if ckey in existing_keys:
                     continue
 
                 candidate_slips.append({
@@ -382,8 +433,22 @@ def auto_generate_slips(current_edges):
                     "ev":          ev,
                     "ev_pct":      ev_pct,
                     "stake":       stake,
-                    "key":         key,
+                    "leg_mults":   leg_mults,
+                    "key":         ckey,
                 })
+
+        for slip_type in AUTOPILOT_SLIP_TYPES[platform]:
+            # 1. Normal flat combos
+            _build_combos(slip_type, flat_pool)
+
+            # 2. Flat combos with one mult leg substituted in (UD only)
+            if platform == "UD":
+                for mult_edge in mult_pool:
+                    _build_combos(slip_type, flat_pool, extra_leg=mult_edge)
+
+            # 3. Flat combos with one taco leg substituted in
+            for taco_edge in taco_pool:
+                _build_combos(slip_type, flat_pool, extra_leg=taco_edge)
 
         candidate_slips.sort(key=lambda c: c["ev_pct"], reverse=True)
 
@@ -445,6 +510,7 @@ def auto_generate_slips(current_edges):
                 "joint_prob":    cand["joint_prob"],
                 "ev":            cand["ev"],
                 "ev_pct":        cand["ev_pct"],
+                "leg_mults":     cand["leg_mults"],
                 "result":        None,
                 "payout":        None,
                 "profit":        None,
@@ -576,7 +642,8 @@ def update_slips(all_bets):
                 ev, ev_pct, joint_prob = 0.0, 0.0, 100.0
             else:
                 ev, ev_pct, joint_prob = calc_ev(
-                    slip["platform"], effective_type, effective_probs, slip["stake"]
+                    slip["platform"], effective_type, effective_probs, slip["stake"],
+                    leg_mults=slip.get("leg_mults"),
                 )
 
         slip["joint_prob"] = joint_prob
@@ -709,7 +776,8 @@ def update_your_slips(all_bets):
                 ev, ev_pct, joint_prob = 0.0, 0.0, 100.0
             else:
                 ev, ev_pct, joint_prob = calc_ev(
-                    slip["platform"], effective_type, effective_probs, slip["stake"]
+                    slip["platform"], effective_type, effective_probs, slip["stake"],
+                    leg_mults=slip.get("leg_mults"),
                 )
 
         slip["joint_prob"] = joint_prob
@@ -940,7 +1008,8 @@ def update_your_slips_from_edges(current_edges, sb_props=None):
                 ev, ev_pct, joint_prob = 0.0, 0.0, 100.0
             else:
                 ev, ev_pct, joint_prob = calc_ev(
-                    slip["platform"], effective_type, effective_probs, slip["stake"]
+                    slip["platform"], effective_type, effective_probs, slip["stake"],
+                    leg_mults=slip.get("leg_mults"),
                 )
 
         slip["joint_prob"] = joint_prob

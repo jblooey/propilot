@@ -25,7 +25,6 @@ NBA_FILTER_IDS = {
 MLB_FILTER_IDS = {
     "hits":               "f932798a-04cf-4718-b620-d1a42bdce97e",
     "rbis":               "a8bb8a04-0a17-4bd0-aaad-86bbd9df7abc",
-    "home_runs":          "53a72b17-e0a3-4d28-b98a-3ce5f7d58d92",
     "total_bases":        "1f670d50-4b2e-4fde-b9c7-598418a986a1",
     "hits_runs_rbis":     "4969134d-144f-4b30-b0bc-3e1932c84385",
     "pitcher_strikeouts": "311b6775-4d03-4466-8ab9-776442468b27",
@@ -105,10 +104,10 @@ def _fetch_ud_props(filter_ids: dict, sport_id: str) -> list[dict]:
                     under_mult  = opt.get("payout_multiplier")
 
             try:
-                if float(over_mult) != 1.0 or float(under_mult) != 1.0:
-                    continue
+                over_mult_f  = float(over_mult)  if over_mult  is not None else 1.0
+                under_mult_f = float(under_mult) if under_mult is not None else 1.0
             except (TypeError, ValueError):
-                continue
+                over_mult_f = under_mult_f = 1.0
 
             results.append({
                 "player":      player_name,
@@ -116,6 +115,8 @@ def _fetch_ud_props(filter_ids: dict, sport_id: str) -> list[dict]:
                 "line":        float(stat_value),
                 "over_price":  over_price,
                 "under_price": under_price,
+                "over_mult":   over_mult_f,
+                "under_mult":  under_mult_f,
             })
 
     return results

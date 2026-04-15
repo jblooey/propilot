@@ -41,14 +41,18 @@ def get_prizepicks_nba():
         try:
             with open(PP_CACHE_FILE) as f:
                 cached = json.load(f)
-            updated_at = datetime.fromisoformat(cached["updated_at"]).replace(tzinfo=timezone.utc)
-            age = (datetime.now(timezone.utc) - updated_at).total_seconds()
-            if age < PP_CACHE_MAX_AGE:
-                players = cached["players"]
-                print(f"  [PrizePicks] Using cached data (age={int(age)}s, {len(players)} players)")
-                return players
+            # Handle old list format (before server wrote proper dict format)
+            if isinstance(cached, list):
+                print(f"  [PrizePicks] Cache in old list format — ignoring, trying direct fetch")
             else:
-                print(f"  [PrizePicks] Cache stale ({int(age)}s), trying direct fetch")
+                updated_at = datetime.fromisoformat(cached["updated_at"]).replace(tzinfo=timezone.utc)
+                age = (datetime.now(timezone.utc) - updated_at).total_seconds()
+                if age < PP_CACHE_MAX_AGE:
+                    players = cached["players"]
+                    print(f"  [PrizePicks] Using cached data (age={int(age)}s, {len(players)} players)")
+                    return players
+                else:
+                    print(f"  [PrizePicks] Cache stale ({int(age)}s), trying direct fetch")
         except Exception as e:
             print(f"  [PrizePicks] Cache read error: {e}")
 
@@ -64,11 +68,20 @@ def _fetch_prizepicks_direct():
     }
 
     headers = {
-        "accept": "application/json",
+        "accept": "application/json, text/plain, */*",
+        "accept-language": "en-US,en;q=0.9",
+        "cache-control": "no-cache",
         "content-type": "application/json",
         "origin": "https://app.prizepicks.com",
-        "referer": "https://app.prizepicks.com/",
-        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "pragma": "no-cache",
+        "referer": "https://app.prizepicks.com/board",
+        "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"macOS"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     }
 
     try:
@@ -112,7 +125,7 @@ def _fetch_prizepicks_direct():
 
     # ── Parse projections ──────────────────────────────────────────
     players = {}
-    skipped_reasons = {"goblin_devil_demon": 0, "promo": 0,
+    skipped_reasons = {"goblin_devil_demon": 0,
                        "not_standard": 0, "combo": 0,
                        "no_player": 0, "player_not_in_map": 0}
 
@@ -125,18 +138,18 @@ def _fetch_prizepicks_direct():
             skipped_reasons["goblin_devil_demon"] += 1
             continue
 
-        # Filter 2: promo
-        if attrs.get("is_promo", False):
-            skipped_reasons["promo"] += 1
-            continue
-
-        # Filter 3: standard only
+        # Filter 2: standard odds_type only — goblins/demons already caught above,
+        # but this also rejects any other non-standard type.
+        # Real promo discount picks always have odds_type="standard" with is_promo=True.
         if odds_type != "standard":
             skipped_reasons["not_standard"] += 1
             continue
 
-        # Filter 4: individual player props only (not combo)
-        event_type = attrs.get("event_type", "").lower()
+        # Capture promo flag (standard picks with discounted price)
+        is_promo = attrs.get("is_promo", False)
+
+        # Filter 3: individual player props only (not combo)
+        event_type = (attrs.get("event_type") or "").lower()
         if event_type != "team":
             skipped_reasons["combo"] += 1
             continue
@@ -155,9 +168,15 @@ def _fetch_prizepicks_direct():
             skipped_reasons["player_not_in_map"] += 1
             continue
 
-        player = player_map[player_id]
-        stat   = normalize_stat(attrs.get("stat_type", ""))
-        line   = attrs.get("line_score")
+        player   = player_map[player_id]
+        stat_raw = attrs.get("stat_type") or ""
+        stat     = normalize_stat(stat_raw)
+        # For promo/taco lines, use the discounted flash_sale_line_score
+        flash_line = attrs.get("flash_sale_line_score")
+        line = flash_line if (is_promo and flash_line is not None) else attrs.get("line_score")
+
+        if line is None:
+            continue  # skip picks with no line
 
         if player_id not in players:
             players[player_id] = {
@@ -167,13 +186,20 @@ def _fetch_prizepicks_direct():
                 "props":    {}
             }
 
-        if stat not in players[player_id]["props"]:
-            players[player_id]["props"][stat] = line
+        prop_entry = {"line": line, "is_promo": is_promo}
+        promo_key = stat + "_PROMO"
+        if is_promo:
+            # Always store promo under a separate key — never clobber the standard line
+            if promo_key not in players[player_id]["props"]:
+                players[player_id]["props"][promo_key] = prop_entry
+        elif stat not in players[player_id]["props"]:
+            players[player_id]["props"][stat] = prop_entry
         else:
-            existing = players[player_id]["props"][stat]
-            if existing != line:
+            existing      = players[player_id]["props"][stat]
+            existing_line  = existing["line"] if isinstance(existing, dict) else existing
+            if existing_line != line:
                 print(f"  [PrizePicks] Duplicate {player['name']} {stat}: "
-                      f"keeping {existing}, ignoring {line}")
+                      f"keeping {existing_line}, ignoring {line}")
 
     return list(players.values())
 
@@ -185,12 +211,16 @@ def get_prizepicks_mlb():
         try:
             with open(PP_MLB_CACHE_FILE) as f:
                 cached = json.load(f)
-            updated_at = datetime.fromisoformat(cached["updated_at"]).replace(tzinfo=timezone.utc)
-            age = (datetime.now(timezone.utc) - updated_at).total_seconds()
-            if age < PP_CACHE_MAX_AGE:
-                players = cached["players"]
-                print(f"  [PrizePicks MLB] Using cached data (age={int(age)}s, {len(players)} players)")
-                return players
+            # Handle old list format
+            if isinstance(cached, list):
+                print(f"  [PrizePicks MLB] Cache in old list format — ignoring, trying direct fetch")
+            else:
+                updated_at = datetime.fromisoformat(cached["updated_at"]).replace(tzinfo=timezone.utc)
+                age = (datetime.now(timezone.utc) - updated_at).total_seconds()
+                if age < PP_CACHE_MAX_AGE:
+                    players = cached["players"]
+                    print(f"  [PrizePicks MLB] Using cached data (age={int(age)}s, {len(players)} players)")
+                    return players
         except Exception as e:
             print(f"  [PrizePicks MLB] Cache read error: {e}")
 
@@ -201,11 +231,20 @@ def get_prizepicks_mlb():
         "single_stat": True,
     }
     headers = {
-        "accept": "application/json",
+        "accept": "application/json, text/plain, */*",
+        "accept-language": "en-US,en;q=0.9",
+        "cache-control": "no-cache",
         "content-type": "application/json",
         "origin": "https://app.prizepicks.com",
-        "referer": "https://app.prizepicks.com/",
-        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        "pragma": "no-cache",
+        "referer": "https://app.prizepicks.com/board",
+        "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"macOS"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     }
 
     try:

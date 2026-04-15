@@ -36,20 +36,31 @@ PUSHOVER_USERS = [
     os.environ["PUSHOVER_USER_FRIEND"],
 ]
 
-alerted_slips = set()
-last_edges    = []
+alerted_slips  = set()
+alerted_tacos  = set()  # track which promo edges we've already notified about
+last_edges     = []
 
 # MLB fetches on a slower 20-min cycle to stay under 100 req/hour per key
-MLB_FETCH_INTERVAL = 1200  # 20 minutes
 _last_mlb_fetch_at  = None
+_nba_cycle_count    = 0    # MLB fetches every 2 NBA cycles (cycles 1, 3, 5, …)
 _last_pp_mlb_props  = []
 _last_ud_mlb_props  = []
 _last_pin_mlb_props = []
 _last_oddsapi_mlb_props = []
 
 STAT_LABEL_TO_KEY = {
+    # NBA
     "POINTS": "points", "REBOUNDS": "rebounds", "ASSISTS": "assists",
     "3PM": "threes", "PRA": "pra", "PR": "pr", "PA": "pa", "RA": "ra",
+    # MLB — these are stored uppercased in slip details
+    "HITS": "hits", "RBIS": "rbis", "HOME_RUNS": "home_runs",
+    "TOTAL_BASES": "total_bases", "RUNS": "runs",
+    "BATTER_STRIKEOUTS": "batter_strikeouts", "STOLEN_BASES": "stolen_bases",
+    "SINGLES": "singles", "DOUBLES": "doubles", "TRIPLES": "triples",
+    "HITS_RUNS_RBIS": "hits_runs_rbis", "WALKS": "walks",
+    "PITCHER_STRIKEOUTS": "pitcher_strikeouts", "PITCHING_OUTS": "pitching_outs",
+    "HITS_ALLOWED": "hits_allowed", "EARNED_RUNS": "earned_runs",
+    "WALKS_ALLOWED": "walks_allowed", "PITCHES_THROWN": "pitches_thrown",
 }
 
 
@@ -63,6 +74,27 @@ def send_alert(e):
     lines.append(f"{e['platform']} | {e['player']}")
     lines.append(f"{e['direction']} {e['platform_line']} {e['stat'].upper()} — {e['prob']}%")
     lines.append(f"{e['books']} books")
+
+def send_taco_alert(promo_edges):
+    """Push notification when PP taco/promo lines drop — user can manually build the slip."""
+    lines = ["🌮 Taco Tuesday drop — build this manually in Your Bets!", ""]
+    for e in promo_edges:
+        stat_disp = e["stat"].upper()
+        lines.append(f"• {e['player']} ({e['team']}) {e['direction']} {e['platform_line']} {stat_disp} — {e['prob']}%")
+    msg = "\n".join(lines)
+    for user_key in PUSHOVER_USERS:
+        r = requests.post("https://api.pushover.net/1/messages.json", data={
+            "token":   PUSHOVER_TOKEN,
+            "user":    user_key,
+            "title":   "🌮 Taco Drop",
+            "message": msg,
+            "sound":   "magic",
+        })
+        if r.status_code == 200:
+            print(f"  [TACO ALERT SENT] ...{user_key[-6:]}")
+        else:
+            print(f"  [TACO ALERT FAILED] ...{user_key[-6:]} {r.status_code}")
+
 
 def send_slip_alert(slip, data_updated_at=None):
     platform_label = "PrizePicks" if slip["platform"] == "PP" else "Underdog"
@@ -129,18 +161,16 @@ def settle_only():
 
 
 def _should_fetch_mlb() -> bool:
-    global _last_mlb_fetch_at
-    now = datetime.now(timezone.utc)
-    if _last_mlb_fetch_at is None:
-        return True
-    return (now - _last_mlb_fetch_at).total_seconds() >= MLB_FETCH_INTERVAL
+    """Fetch MLB on every other NBA cycle (cycles 1, 3, 5, …)."""
+    return _nba_cycle_count % 2 == 1
 
 
 def run():
-    global last_edges, _last_mlb_fetch_at
+    global last_edges, _last_mlb_fetch_at, _nba_cycle_count
     global _last_pp_mlb_props, _last_ud_mlb_props, _last_pin_mlb_props, _last_oddsapi_mlb_props
+    _nba_cycle_count += 1
     print(f"\n{'#'*60}")
-    print(f"  RUN AT {datetime.now().strftime('%I:%M:%S %p')}")
+    print(f"  RUN AT {datetime.now().strftime('%I:%M:%S %p')} (NBA cycle #{_nba_cycle_count})")
     print(f"{'#'*60}")
 
     # Settlement always runs, even if prop fetching fails below
@@ -172,6 +202,17 @@ def run():
         if fetch_mlb:
             print("Fetching PrizePicks MLB...")
             pp_mlb_props = get_prizepicks_mlb()
+            if not pp_mlb_props:
+                try:
+                    import json as _json
+                    _cache_path = os.path.join(os.path.dirname(__file__), "pp_mlb_props_cache.json")
+                    with open(_cache_path) as _f:
+                        _cached = _json.load(_f)
+                    pp_mlb_props = _cached.get("players", [])
+                    if pp_mlb_props:
+                        print(f"  [PP MLB] Direct fetch blocked — loaded {len(pp_mlb_props)} players from cache")
+                except (OSError, KeyError):
+                    pass
             print(f"  {len(pp_mlb_props)} players")
 
             print("Fetching Underdog MLB...")
@@ -192,8 +233,7 @@ def run():
             _last_pin_mlb_props     = pin_mlb_props
             _last_oddsapi_mlb_props = oddsapi_mlb_props
         else:
-            mins_left = int((MLB_FETCH_INTERVAL - (datetime.now(timezone.utc) - _last_mlb_fetch_at).total_seconds()) / 60)
-            print(f"  [MLB] Skipping fetch — next in ~{mins_left}m (using cached data)")
+            print(f"  [MLB] Skipping fetch — next MLB fetch on cycle #{_nba_cycle_count + 1} (using cached data)")
             pp_mlb_props      = _last_pp_mlb_props
             ud_mlb_props      = _last_ud_mlb_props
             pin_mlb_props     = _last_pin_mlb_props
@@ -253,10 +293,13 @@ def run():
             for bk, ts in _oddsapi._book_updated_at.items():
                 if ts:
                     book_ages[bk] = int((now_utc - ts).total_seconds())
+            ts_fmt = "%Y-%m-%dT%H:%M:%SZ"
             cache_payload = {
                 "edges": all_edges,
                 "book_ages": book_ages,
                 "stale_books": list(stale_books),
+                "nba_updated_at": now_utc.strftime(ts_fmt),
+                "mlb_updated_at": _last_mlb_fetch_at.strftime(ts_fmt) if _last_mlb_fetch_at else now_utc.strftime(ts_fmt),
             }
             with open("edges_cache.json", "w") as f:
                 json.dump(cache_payload, f)
@@ -275,10 +318,25 @@ def run():
             auto_generate_slips([])  # still promotes live → active, no new slips
             new_slips = []
         else:
-            # Update active bet tracker (add new bets) — sharp edges only
-            update_bets(sharp_edges)
+            # Separate promo (taco) edges — autopilot ignores them; user builds manually
+            promo_edges  = [e for e in sharp_edges if e.get("is_promo")]
+            normal_edges = [e for e in sharp_edges if not e.get("is_promo")]
 
-            # Auto-generate new slips
+            # Alert for new taco drops (once per player+stat per session)
+            new_tacos = []
+            for e in promo_edges:
+                taco_key = f"{e['player']}:{e['stat']}:{e['direction']}:{e.get('game_date','')}"
+                if taco_key not in alerted_tacos:
+                    alerted_tacos.add(taco_key)
+                    new_tacos.append(e)
+                    print(f"  [TACO] {e['player']} {e['direction']} {e['platform_line']} {e['stat']} — {e['prob']}% (promo, 45% EV threshold)")
+            if new_tacos:
+                send_taco_alert(new_tacos)
+
+            # Update active bet tracker (normal edges only — don't log promo lines as tracked bets)
+            update_bets(normal_edges)
+
+            # Auto-generate slips — promo edges included, but gated at 45% EV inside slip_tracker
             # Stale check disabled — WebSocket trial until ~Apr 16 2026
             new_slips = auto_generate_slips(sharp_edges)
         for slip in new_slips:

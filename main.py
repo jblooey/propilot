@@ -79,12 +79,26 @@ BOOK_WEIGHTS = {
 }
 
 # Flat vig odds for DFS platforms (no two-sided market, fixed take rate)
-UD_DECIMAL  = round(100 / 115 + 1, 6)   # -115 → 1.869565
+UD_DECIMAL  = round(100 / 115 + 1, 6)   # -115 → 1.869565 (UD standard flat)
 PP_DECIMAL  = round(100 / 119 + 1, 6)   # -119 → 1.840336
+
+
+def ud_decimal_for_mult(mult: float) -> float:
+    """Convert a UD payout multiplier to decimal odds anchored at -115 baseline.
+    1.0x → 1.8696 (-115), 0.75x → 1.4022 (-249), 1.04x → 1.9443 (-106).
+    """
+    return round(UD_DECIMAL * mult, 6)
 
 COMBO_STATS  = {"PRA", "PR", "PA", "RA"}
 SHARP_BOOKS  = {"fanduel"}
 SPORTSBOOKS  = {"pinnacle", "fanduel", "draftkings", "betmgm", "caesars"}
+
+# Stats where DFS platforms only offer OVER (no meaningful under market exists)
+OVER_ONLY_STATS = {
+    "rbis", "home_runs", "stolen_bases", "runs",
+    "hits_runs_rbis", "walks", "walks_allowed",
+    "batter_strikeouts", "singles", "doubles", "triples",
+}
 MIN_BOOKS    = 1
 MIN_PROB_PP  = 0.50
 MIN_PROB_UD  = 0.50
@@ -143,14 +157,25 @@ def flatten_pp_props(pp_props):
         "PA":  "pa",
     }
     for p in pp_props:
-        for stat_key, line in p["props"].items():
-            mapped = stat_map.get(stat_key)
+        for stat_key, prop_val in p["props"].items():
+            # Handle _PROMO suffix keys (taco/discount lines stored separately)
+            is_promo_key = stat_key.endswith("_PROMO")
+            base_key = stat_key[:-6] if is_promo_key else stat_key
+            mapped = stat_map.get(base_key)
             if not mapped:
                 continue
+            # prop_val may be a dict {"line": ..., "is_promo": ...} or a bare number
+            if isinstance(prop_val, dict):
+                line     = prop_val["line"]
+                is_promo = prop_val.get("is_promo", False) or is_promo_key
+            else:
+                line     = prop_val
+                is_promo = is_promo_key
             flat.append({
                 "player":      p["name"],
                 "stat":        mapped,
                 "line":        float(line),
+                "is_promo":    is_promo,
                 "over_price":  None,
                 "under_price": None,
                 # PP has no game anchor data; these will be filled from sb_props
@@ -315,12 +340,13 @@ def build_sb_props(dk_props, pinnacle_props, oddsapi_props):
 
 
 def build_ref_lookup(ref_props):
+    """Returns {(norm_player, stat): prop_dict} so callers can access line + odds."""
     lookup = {}
     if not ref_props:
         return lookup
     for prop in ref_props:
         key = (normalize_name(prop["player"]), prop["stat"])
-        lookup[key] = prop["line"]
+        lookup[key] = prop
     return lookup
 
 
@@ -468,41 +494,50 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
         sb_only = {k: v for k, v in stat_data.items() if k in SPORTSBOOKS}
         n_books = len(sb_only)
 
-        # Look up ref line early so we can use it below
-        _ref = None
+        # Look up ref prop (full dict) early so we can access line + odds
+        _ref_prop = None
         if ref_lookup:
             norm_player = normalize_name(player)
             ref_key = (norm_player, stat_key)
-            _ref = ref_lookup.get(ref_key)
-            if _ref is None:
-                for (rp, rs), rl in ref_lookup.items():
+            _ref_prop = ref_lookup.get(ref_key)
+            if _ref_prop is None:
+                for (rp, rs), rp_dict in ref_lookup.items():
                     if rs == stat_key and names_match(player, rp):
-                        _ref = rl
+                        _ref_prop = rp_dict
                         break
+        _ref = _ref_prop["line"] if _ref_prop is not None else None
 
         # Need at least one source to proceed
         if not sb_only and _ref is None:
             continue
 
-        # Inject the ref platform (PP or UD) into stat_data with its flat vig odds.
-        # UD uses -115/-115 (UD_DECIMAL), PP uses -119/-119 (PP_DECIMAL).
-        # This lets it participate in weighted consensus as a real market signal.
+        # Inject the ref platform (PP or UD) into stat_data.
+        # For UD ref props: use their actual American price → decimal (reflects multiplier).
+        # For PP ref props: use fixed -119 flat vig.
         stat_data_with_ref = dict(stat_data)
-        if _ref is not None:
+        if _ref_prop is not None:
             ref_platform_key = "underdog" if platform_name == "PP" else "prizepicks"
-            ref_decimal = UD_DECIMAL if platform_name == "PP" else PP_DECIMAL
+            if platform_name == "PP":
+                # UD ref — derive decimal from multiplier anchored at -119 baseline
+                over_dec  = ud_decimal_for_mult(_ref_prop.get("over_mult",  1.0))
+                under_dec = ud_decimal_for_mult(_ref_prop.get("under_mult", 1.0))
+            else:
+                # PP ref — fixed flat vig (-119)
+                over_dec  = PP_DECIMAL
+                under_dec = PP_DECIMAL
             stat_data_with_ref[ref_platform_key] = {
                 "line":          _ref,
-                "over_decimal":  ref_decimal,
-                "under_decimal": ref_decimal,
+                "over_decimal":  over_dec,
+                "under_decimal": under_dec,
             }
 
         # Count the ref platform as an extra source when its line disagrees (≥0.5)
         ref_disagrees = _ref is not None and abs(_ref - platform_line) >= 0.5
         effective_n_books = n_books + (1 if ref_disagrees else 0)
 
-        # has_sharp = recommended: 2+ sources total (books or disagreeing ref)
-        has_sharp = effective_n_books >= 2
+        # has_sharp = recommended: FanDuel + 1 other book, OR 3+ books total
+        has_fd    = "fanduel" in sb_only
+        has_sharp = (has_fd and effective_n_books >= 2) or effective_n_books >= 3
 
         # Need at least one source (sportsbook or ref platform) to form a consensus.
         # If only the ref platform is available, has_sharp stays False → "All" only.
@@ -551,6 +586,7 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
             "sb_line":       avg_line,
             "books":         len(sb_only),
             "weight":        total_weight,
+            "is_promo":      prop.get("is_promo", False),
             "pin":           fmt_book("pinnacle",   "OVER"),  # placeholder, overridden below
             "fd":            fmt_book("fanduel",    "OVER"),
             "dk":            fmt_book("draftkings", "OVER"),
@@ -573,6 +609,8 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
                  "prob":       round(adj_over_prob * 100, 1),
                  "ref_agrees": (ref_line <= platform_line) if ref_line is not None else None,
                  "has_sharp":  has_sharp,
+                 "ud_mult":    prop.get("over_mult", 1.0),
+                 "ud_price":   prop.get("over_price"),
                  "pin":        fmt_book("pinnacle",   "OVER"),
                  "fd":         fmt_book("fanduel",    "OVER"),
                  "dk":         fmt_book("draftkings", "OVER"),
@@ -582,12 +620,14 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
             }
             edges.append(e)
 
-        if adj_under_prob >= min_prob:
+        if adj_under_prob >= min_prob and stat_key not in OVER_ONLY_STATS:
             e = {**base_edge,
                  "direction":  "UNDER",
                  "prob":       round(adj_under_prob * 100, 1),
                  "ref_agrees": (ref_line >= platform_line) if ref_line is not None else None,
                  "has_sharp":  has_sharp,
+                 "ud_mult":    prop.get("under_mult", 1.0),
+                 "ud_price":   prop.get("under_price"),
                  "pin":        fmt_book("pinnacle",   "UNDER"),
                  "fd":         fmt_book("fanduel",    "UNDER"),
                  "dk":         fmt_book("draftkings", "UNDER"),

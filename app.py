@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, request, redirect, url_for
+from flask import Flask, jsonify, render_template, request, redirect, url_for, make_response
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from bet_tracker import load_bets
@@ -97,15 +97,20 @@ def load_latest_edges():
             with open("edges_cache.json") as f:
                 content = f.read().strip()
                 if not content:
-                    return [], {}, []
+                    return [], {}, [], None, None
                 data = json.loads(content)
                 if isinstance(data, list):
-                    return data, {}, []
-                return data.get("edges", []), data.get("book_ages", {}), data.get("stale_books", [])
+                    return data, {}, [], None, None
+                return (
+                    data.get("edges", []),
+                    data.get("book_ages", {}),
+                    data.get("stale_books", []),
+                    data.get("nba_updated_at"),
+                    data.get("mlb_updated_at"),
+                )
     except (OSError, ValueError):
         pass
-    return [], {}, []
-    return []
+    return [], {}, [], None, None
 
 
 def _rolling_7_cutoff():
@@ -335,15 +340,22 @@ def push_unsubscribe():
 @app.route("/")
 @login_required
 def your_bets_page():
-    return render_template("index.html")
+    resp = make_response(render_template("index.html"))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
 
 
 @app.route("/autopilot")
 def autopilot_page():
-    return render_template("bets.html")
+    resp = make_response(render_template("bets.html"))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
 
-PP_PROPS_CACHE = os.path.join(os.path.dirname(__file__), "pp_props_cache.json")
-PP_PUSH_SECRET = os.environ.get("PP_PUSH_SECRET", "propilot-pp-secret")
+PP_PROPS_CACHE     = os.path.join(os.path.dirname(__file__), "pp_props_cache.json")
+PP_MLB_PROPS_CACHE = os.path.join(os.path.dirname(__file__), "pp_mlb_props_cache.json")
+PP_PUSH_SECRET     = os.environ.get("PP_PUSH_SECRET", "propilot-pp-secret")
 
 @app.route("/api/pp-props", methods=["POST"])
 def receive_pp_props():
@@ -353,6 +365,18 @@ def receive_pp_props():
     if not isinstance(data, list):
         return jsonify({"error": "expected list"}), 400
     with open(PP_PROPS_CACHE, "w") as f:
+        json.dump({"players": data, "updated_at": datetime.utcnow().isoformat()}, f)
+    return jsonify({"ok": True, "count": len(data)})
+
+
+@app.route("/api/pp-mlb-props", methods=["POST"])
+def receive_pp_mlb_props():
+    if request.headers.get("X-PP-Secret") != PP_PUSH_SECRET:
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json(force=True)
+    if not isinstance(data, list):
+        return jsonify({"error": "expected list"}), 400
+    with open(PP_MLB_PROPS_CACHE, "w") as f:
         json.dump({"players": data, "updated_at": datetime.utcnow().isoformat()}, f)
     return jsonify({"ok": True, "count": len(data)})
 
@@ -375,11 +399,13 @@ def logo_preview():
 
 @app.route("/api/edges")
 def api_edges():
-    edges, book_ages, stale_books = load_latest_edges()
+    edges, book_ages, stale_books, nba_updated_at, mlb_updated_at = load_latest_edges()
     return jsonify({
         "edges": edges,
         "book_ages": book_ages,
         "stale_books": stale_books,
+        "nba_updated_at": nba_updated_at,
+        "mlb_updated_at": mlb_updated_at,
     })
 
 

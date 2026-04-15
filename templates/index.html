@@ -62,7 +62,7 @@ body {
 .topbar {
   background: var(--bg);
   border-bottom: 1px solid var(--border);
-  height: 40px;
+  height: 72px;
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 20px;
   position: sticky; top: 0; z-index: 200;
@@ -78,17 +78,48 @@ body {
 .logo-text { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
 .logo-text .lt-w { color: var(--text-1); }
 .logo-text .lt-c { color: var(--accent); }
-.nav-links { display: flex; align-items: center; gap: 16px; }
+.lt-last-t { position: relative; display: inline-block; }
+.sombrero {
+  display: none;
+  position: absolute;
+  top: -9px;
+  left: 52%;
+  transform: translateX(-50%) rotate(16deg);
+  transform-origin: 50% 100%;
+  pointer-events: none;
+  line-height: 1;
+}
+.nav-links {
+  display: flex; align-items: center; gap: 20px;
+  position: absolute; left: 50%; transform: translateX(-50%);
+}
 .nav-link {
-  font-size: 12px; font-weight: 500; color: var(--text-3);
+  font-size: 13px; font-weight: 500; color: var(--text-3);
   text-decoration: none; padding-bottom: 2px;
   border-bottom: 1px solid transparent;
   transition: color var(--t), border-color var(--t);
-  line-height: 40px;
+  line-height: 72px;
 }
 .nav-link.active   { color: var(--text-1); border-bottom-color: var(--accent); }
 .nav-link.inactive:hover { color: var(--text-2); }
 .topbar-right { display: flex; align-items: center; gap: 12px; }
+
+/* ── Taco Tuesday overlay ── */
+#tacoOverlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.88);
+  align-items: center; justify-content: center;
+  overflow: hidden; cursor: pointer;
+}
+.mariachi-left  { font-size: 64px; animation: mariachiInL 0.65s cubic-bezier(0.2,0.8,0.3,1) both; margin-right: 36px; }
+.mariachi-right { font-size: 64px; animation: mariachiInR 0.65s cubic-bezier(0.2,0.8,0.3,1) both; margin-left: 36px; }
+.taco-center { text-align: center; animation: tacoIn 0.45s 0.3s ease both; }
+.taco-emoji  { font-size: 88px; line-height: 1; }
+.taco-label  { font-size: 30px; font-weight: 800; letter-spacing: 0.14em; color: #c8922a; margin-top: 14px; text-shadow: 0 0 40px rgba(200,146,42,0.55); }
+@keyframes mariachiInL { from { transform: translateX(-140%) scale(0.7); opacity: 0; } to { transform: translateX(0) scale(1); opacity: 1; } }
+@keyframes mariachiInR { from { transform: translateX(140%) scale(0.7); opacity: 0; } to { transform: translateX(0) scale(1); opacity: 1; } }
+@keyframes tacoIn { from { opacity: 0; transform: scale(0.6) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 .live-badge {
   display: flex; align-items: center; gap: 5px;
   font-family: 'JetBrains Mono', monospace;
@@ -107,6 +138,29 @@ body {
   padding: 2px 7px;
 }
 .refresh-badge.stale { color: var(--amber); border-color: rgba(245,158,11,0.4); }
+
+/* ── Topbar buttons ── */
+.topbar-btn {
+  background: none; border: 1px solid var(--border-2); border-radius: var(--r);
+  cursor: pointer; font-size: 11px; color: var(--text-3); font-family: 'Inter', sans-serif;
+  padding: 3px 8px; transition: border-color var(--t), color var(--t); white-space: nowrap;
+}
+.topbar-btn:hover { border-color: var(--accent); color: var(--text-1); }
+.topbar-btn.on    { color: var(--green); border-color: rgba(34,197,94,0.4); }
+.topbar-link {
+  font-size: 11px; color: var(--text-4); text-decoration: none; transition: color var(--t);
+}
+.topbar-link:hover { color: var(--text-2); }
+
+/* ── Search with clear ── */
+.search-wrap { position: relative; display: flex; align-items: center; }
+.search-clear {
+  position: absolute; right: 7px; background: none; border: none;
+  cursor: pointer; color: var(--text-4); font-size: 13px; line-height: 1;
+  padding: 0; display: none; transition: color var(--t);
+}
+.search-clear:hover { color: var(--text-2); }
+.search-clear.show { display: block; }
 
 /* ── Layout ── */
 /* ── Your Bets stats strip ── */
@@ -144,9 +198,10 @@ body {
 
 .layout {
   display: flex;
-  height: calc(100vh - 40px - 82px);
+  height: calc(100vh - 72px - 82px);
   padding: 10px 16px 12px;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 /* ── Feed panel ── */
@@ -186,18 +241,47 @@ body {
 .ftab.ud-on { color: #fbbf24; background: rgba(217,119,6,0.10);  border: 1px solid rgba(217,119,6,0.35); }
 .ftab#fPP:not(.pp-on):hover { color: #a78bfa; }
 .ftab#fUD:not(.ud-on):hover { color: #fbbf24; }
-.all-toggle {
+.edge-mode-group {
+  display: flex; align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-sm);
+  padding: 2px;
+  gap: 1px;
+}
+.edge-mode-btn {
+  font-size: 11px; font-weight: 500;
+  padding: 3px 10px; border-radius: 3px;
+  border: none; background: transparent;
+  color: var(--text-4);
+  cursor: pointer; transition: all var(--t);
+  white-space: nowrap;
+}
+.edge-mode-btn:hover { color: var(--text-2); }
+.edge-mode-btn.active {
+  background: var(--surface);
+  color: var(--text-1);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.player-search {
+  font-size: 11px; font-family: 'Inter', sans-serif;
+  padding: 3px 9px; border-radius: var(--r-sm);
+  border: 1px solid var(--border-2);
+  background: var(--surface-2); color: var(--text-1);
+  outline: none; width: 140px; transition: border-color var(--t), width var(--t);
+}
+.player-search::placeholder { color: var(--text-4); }
+.player-search:focus { border-color: var(--accent); width: 180px; }
+
+.mult-jump-btn {
   font-size: 11px; font-weight: 600;
   padding: 3px 10px; border-radius: var(--r-sm);
-  border: 1px solid var(--border-2);
-  background: transparent; color: var(--text-3);
+  border: 1px solid var(--ud-border);
+  background: rgba(217,119,6,0.08); color: var(--ud);
   cursor: pointer; transition: all var(--t);
 }
-.all-toggle:hover { color: var(--red); border-color: rgba(239,68,68,0.4); }
-.all-toggle.on {
-  color: var(--red); background: rgba(239,68,68,0.10);
-  border-color: rgba(239,68,68,0.45);
-}
+.mult-jump-btn:hover { background: rgba(217,119,6,0.16); }
 .edge-mode-toggle { display: flex; gap: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 2px; }
 .em-btn {
   font-size: 11px; font-weight: 500;
@@ -356,6 +440,73 @@ body {
 .bk-line { font-size: 12px; font-weight: 600; color: var(--text-1); }
 .bk-odds { font-size: 10px; font-weight: 400; color: var(--text-3); }
 
+/* ── Multiplier section ── */
+.mult-section-title {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px 8px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.09em; color: var(--ud);
+  border-bottom: 1px solid var(--border);
+}
+.mult-section-title .ms-sub {
+  font-size: 10px; font-weight: 400; text-transform: none;
+  letter-spacing: 0; color: var(--text-3); font-family: 'JetBrains Mono', monospace;
+}
+
+/* Multiplier grid — Mult + True%/UD% + %EV columns after Line */
+.mult-col-headers {
+  display: grid;
+  grid-template-columns: 20px 1fr 44px 110px 50px 48px 96px 62px 56px 56px 56px 56px 56px 65px;
+  padding: 5px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; gap: 6px;
+  align-items: center;
+  min-width: 970px;
+}
+.edge-row.mult-row {
+  grid-template-columns: 20px 1fr 44px 110px 50px 48px 96px 62px 56px 56px 56px 56px 56px 65px;
+  min-width: 970px;
+}
+
+/* Multiplier cell */
+.c-mult {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; font-weight: 700;
+  text-align: center;
+}
+.c-mult.m-up   { color: #4ade80; }   /* >1.0x — demon, harder but better payout */
+.c-mult.m-down { color: #f87171; }   /* <1.0x — goblin, easier but reduced payout */
+.c-mult.m-flat { color: var(--text-3); }
+
+/* Dual prob cell — true% / UD implied% */
+.c-prob-dual {
+  padding: 3px 6px; border-radius: 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 600;
+  text-align: center;
+  display: flex; flex-direction: column; gap: 1px;
+  border: 1px solid var(--border);
+}
+.c-prob-dual.prob-green  { background: rgba(34,197,94,0.18);  border-color: rgba(34,197,94,0.32); }
+.c-prob-dual.prob-neutral{ background: rgba(113,113,122,0.12); border-color: var(--border); }
+.c-prob-dual.prob-red    { background: rgba(239,68,68,0.12);   border-color: rgba(239,68,68,0.25); }
+.pd-true  { font-size: 11px; font-weight: 700; }
+.pd-true.prob-green  { color: #4ade80; }
+.pd-true.prob-neutral{ color: var(--text-3); }
+.pd-true.prob-red    { color: #f87171; }
+.pd-ud    { font-size: 9px; font-weight: 400; color: var(--text-3); border-top: 1px solid var(--border); margin-top: 1px; padding-top: 1px; }
+
+/* 2-pick EV cell */
+.c-pev {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 700;
+  text-align: center; padding: 3px 4px;
+  border-radius: 5px; line-height: 1.3;
+}
+.c-pev.pev-pos { background: rgba(34,197,94,0.18); color: #4ade80; border: 1px solid rgba(34,197,94,0.32); }
+.c-pev.pev-neg { background: rgba(239,68,68,0.10);  color: #f87171; border: 1px solid rgba(239,68,68,0.22); }
+.pev-sub { font-size: 9px; font-weight: 500; opacity: 0.65; }
+
 /* Book detail items */
 .detail-book {
   display: flex; flex-direction: column;
@@ -491,7 +642,7 @@ body {
   cursor: pointer; transition: background var(--t);
   display: none;
 }
-.track-btn:hover { background: #4f5bbf; }
+.track-btn:hover { background: #06b6d4; }
 .track-btn.show { display: block; }
 .track-btn:disabled { background: var(--border-2); cursor: not-allowed; color: var(--text-4); }
 
@@ -679,13 +830,13 @@ body {
 @media (max-width: 768px) {
 
   /* ── Topbar ── */
-  .topbar { padding: 0 12px; gap: 0; }
+  .topbar { padding: 0 12px; gap: 0; height: 56px; }
   .topbar-ts, .refresh-badge { display: none; }
   .topbar-right { gap: 8px; }
   .topbar-right > button { display: none; } /* hide Overview btn */
   .logo-text { font-size: 14px; }
   .nav-links { gap: 12px; }
-  .nav-link { font-size: 11px; }
+  .nav-link { font-size: 11px; line-height: 56px; }
 
   /* ── Stats strip: horizontal scroll ── */
   .your-stats-strip {
@@ -774,6 +925,8 @@ body {
   .toast.show { transform: translateY(0); }
 }
 
+/* ── Splash screen ── */
+#splash {
   position: fixed; inset: 0; z-index: 9999;
   background: #08080a;
   display: flex; align-items: center; justify-content: center;
@@ -781,98 +934,29 @@ body {
   transition: opacity 500ms ease;
 }
 #splash.out { opacity: 0; pointer-events: none; }
-
-/* Radar */
-.splash-radar {
-  position: relative;
-  width: 200px; height: 200px;
-  display: flex; align-items: center; justify-content: center;
-}
-/* Concentric rings */
-.splash-radar::before, .splash-radar::after {
-  content: ''; position: absolute;
-  border-radius: 50%; border: 1px solid rgba(34,211,238,0.10);
-  animation: radarAppear 400ms ease both;
-}
+.splash-radar { position: relative; width: 200px; height: 200px; display: flex; align-items: center; justify-content: center; }
+.splash-radar::before, .splash-radar::after { content: ''; position: absolute; border-radius: 50%; border: 1px solid rgba(34,211,238,0.10); animation: radarAppear 400ms ease both; }
 .splash-radar::before { width: 200px; height: 200px; }
 .splash-radar::after  { width: 130px; height: 130px; animation-delay: 60ms; }
-.radar-ring-sm {
-  position: absolute; width: 68px; height: 68px;
-  border-radius: 50%; border: 1px solid rgba(34,211,238,0.10);
-  animation: radarAppear 400ms 120ms ease both;
-}
-@keyframes radarAppear {
-  from { opacity: 0; transform: scale(0.85); }
-  to   { opacity: 1; transform: scale(1); }
-}
-/* Crosshair lines */
-.radar-cross {
-  position: absolute; inset: 0;
-  animation: radarAppear 400ms 80ms ease both;
-}
-.radar-cross::before, .radar-cross::after {
-  content: ''; position: absolute;
-  background: rgba(34,211,238,0.08);
-}
+.radar-ring-sm { position: absolute; width: 68px; height: 68px; border-radius: 50%; border: 1px solid rgba(34,211,238,0.10); animation: radarAppear 400ms 120ms ease both; }
+@keyframes radarAppear { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+.radar-cross { position: absolute; inset: 0; animation: radarAppear 400ms 80ms ease both; }
+.radar-cross::before, .radar-cross::after { content: ''; position: absolute; background: rgba(34,211,238,0.08); }
 .radar-cross::before { left: 50%; top: 0; bottom: 0; width: 1px; transform: translateX(-50%); }
 .radar-cross::after  { top: 50%; left: 0; right: 0; height: 1px; transform: translateY(-50%); }
-/* Sweep */
-.radar-sweep {
-  position: absolute; width: 100px; height: 100px;
-  top: 50%; left: 50%; margin: -50px 0 0 -50px;
-  border-radius: 50%;
-  background: conic-gradient(from 0deg, transparent 75%, rgba(34,211,238,0.22) 90%, rgba(34,211,238,0.05) 100%);
-  animation: radarSpin 1.4s linear 300ms 2 both;
-  transform-origin: center;
-}
+.radar-sweep { position: absolute; width: 100px; height: 100px; top: 50%; left: 50%; margin: -50px 0 0 -50px; border-radius: 50%; background: conic-gradient(from 0deg, transparent 75%, rgba(34,211,238,0.22) 90%, rgba(34,211,238,0.05) 100%); animation: radarSpin 1.4s linear 300ms 2 both; transform-origin: center; }
 @keyframes radarSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-/* Center mark */
-.splash-center-mark {
-  position: relative; z-index: 2;
-  width: 64px; height: 64px;
-  background: #111113;
-  border: 1.5px solid rgba(34,211,238,0.30);
-  border-radius: 16px;
-  display: flex; align-items: center; justify-content: center;
-  animation: markPop 500ms 500ms cubic-bezier(0.16,1,0.3,1) both;
-  box-shadow: 0 0 24px rgba(34,211,238,0.12), inset 0 1px 0 rgba(255,255,255,0.04);
-}
+.splash-center-mark { position: relative; z-index: 2; width: 64px; height: 64px; background: #111113; border: 1.5px solid rgba(34,211,238,0.30); border-radius: 16px; display: flex; align-items: center; justify-content: center; animation: markPop 500ms 500ms cubic-bezier(0.16,1,0.3,1) both; box-shadow: 0 0 24px rgba(34,211,238,0.12), inset 0 1px 0 rgba(255,255,255,0.04); }
 .splash-center-mark svg { width: 34px; height: 34px; }
-@keyframes markPop {
-  from { opacity: 0; transform: scale(0.7); }
-  to   { opacity: 1; transform: scale(1); }
-}
-/* Ping dot — appears as sweep passes */
-.radar-ping {
-  position: absolute;
-  width: 5px; height: 5px; border-radius: 50%;
-  background: #22d3ee;
-  box-shadow: 0 0 6px 2px rgba(34,211,238,0.6);
-  animation: pingAppear 300ms 1800ms ease both;
-}
+@keyframes markPop { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: scale(1); } }
+.radar-ping { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #22d3ee; box-shadow: 0 0 6px 2px rgba(34,211,238,0.6); animation: pingAppear 300ms 1800ms ease both; }
 .radar-ping-1 { top: 22%; left: 68%; }
 .radar-ping-2 { top: 58%; left: 20%; }
 .radar-ping-3 { top: 75%; left: 62%; }
-@keyframes pingAppear {
-  from { opacity: 0; transform: scale(0); }
-  to   { opacity: 1; transform: scale(1); }
-}
-/* Wordmark */
-.splash-word {
-  font-size: 20px; font-weight: 700; letter-spacing: -0.02em;
-  animation: splashText 400ms 700ms cubic-bezier(0.16,1,0.3,1) both;
-}
-@keyframes splashText {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-/* Tagline */
-.splash-tag {
-  font-size: 10px; font-weight: 500; letter-spacing: 0.12em;
-  text-transform: uppercase; color: #3f3f46;
-  animation: splashText 400ms 850ms cubic-bezier(0.16,1,0.3,1) both;
-  margin-top: -24px;
-}
+@keyframes pingAppear { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
+.splash-word { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; animation: splashText 400ms 700ms cubic-bezier(0.16,1,0.3,1) both; }
+@keyframes splashText { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.splash-tag { font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: #3f3f46; animation: splashText 400ms 850ms cubic-bezier(0.16,1,0.3,1) both; margin-top: -24px; }
 </style>
 </head>
 <body>
@@ -904,7 +988,7 @@ body {
         <path d="M17.5 9.5L3 4.5v4l5 1.5-5 1.5v4l14.5-5c.33-.11.33-.89 0-1z" fill="#22d3ee"/>
       </svg>
     </div>
-    <div class="logo-text"><span class="lt-w">Prop</span><span class="lt-c">ilot</span></div>
+    <div class="logo-text"><span class="lt-w">Prop</span><span class="lt-c">ilo<span class="lt-last-t">t<span class="sombrero" id="sombrero"><svg width="28" height="20" viewBox="0 0 28 20" fill="none"><!-- brim shadow --><ellipse cx="14" cy="15" rx="13.5" ry="4.2" fill="rgba(0,0,0,0.3)"/><!-- brim --><ellipse cx="14" cy="14" rx="13.5" ry="4.2" fill="#c1121f"/><!-- brim top face --><ellipse cx="14" cy="13" rx="13.5" ry="3.5" fill="#e63946"/><!-- yellow trim ring --><ellipse cx="14" cy="13" rx="10" ry="2.4" fill="none" stroke="#ffd60a" stroke-width="1.3"/><!-- crown --><path d="M8 13 Q7.5 5.5 14 4 Q20.5 5.5 20 13" fill="#c8922a"/><!-- crown highlight --><path d="M10 13 Q9.5 7 14 5.5 Q18.5 7 18 13" fill="#d4a843" opacity="0.5"/><!-- green band --><path d="M8.2 11 Q7.8 9.5 14 9 Q20.2 9.5 19.8 11 Q20.2 12.5 14 13 Q7.8 12.5 8.2 11Z" fill="#2d6a4f"/><!-- band dots --><circle cx="11" cy="11" r="0.85" fill="#ffd60a"/><circle cx="14" cy="11" r="0.85" fill="#ffd60a"/><circle cx="17" cy="11" r="0.85" fill="#ffd60a"/><!-- brim pompoms --><circle cx="2" cy="14" r="1.3" fill="#ffd60a"/><circle cx="26" cy="14" r="1.3" fill="#ffd60a"/><circle cx="7.5" cy="17" r="1.1" fill="#ffd60a"/><circle cx="14" cy="17.8" r="1.1" fill="#ffd60a"/><circle cx="20.5" cy="17" r="1.1" fill="#ffd60a"/></svg></span></span></span></div>
   </div>
   <div class="nav-links">
     <a href="/" class="nav-link active">Your Bets</a>
@@ -912,10 +996,11 @@ body {
   </div>
   <div class="topbar-right">
     <div class="live-badge"><div class="live-dot"></div>Live</div>
-    <div class="refresh-badge" id="refreshBadge">Updated —</div>
+    <div class="refresh-badge" id="nbaRefreshBadge">NBA —</div>
+    <div class="refresh-badge" id="mlbRefreshBadge">MLB —</div>
     <div class="topbar-ts" id="ts">--:-- --</div>
-    <button onclick="openVideoModal()" style="background:none;border:1px solid var(--border-2);border-radius:var(--r);cursor:pointer;font-size:11px;color:var(--text-3);font-family:'Inter',sans-serif;padding:3px 8px;transition:border-color 150ms,color 150ms;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--text-1)'" onmouseout="this.style.borderColor='var(--border-2)';this.style.color='var(--text-3)'">▶ Overview</button>
-    <a href="/logout" style="font-size:11px;color:var(--text-4);text-decoration:none;transition:color 150ms ease;" onmouseover="this.style.color='var(--text-2)'" onmouseout="this.style.color='var(--text-4)'">Sign out</a>
+    <button class="topbar-btn" onclick="openVideoModal()">▶ Overview</button>
+    <a href="/logout" class="topbar-link">Sign out</a>
   </div>
 </div>
 
@@ -985,20 +1070,27 @@ body {
     <div class="feed-toolbar">
       <div class="feed-title-group">
         <div class="feed-title">Edge Feed</div>
-        <span class="feed-count" id="edgeCount">0 edges</span>
-        <span class="feed-hint">Click to select · 2–6 picks</span>
+        <span class="feed-count" id="edgeCount"></span>
         <span class="downtime-notice" id="downtimeNotice" style="display:none">&#9790; Data dormant 12–10 AM</span>
-        <span class="book-freshness" id="bookFreshness"></span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <button class="all-toggle" id="allToggle" onclick="toggleAllEdges()">Show All</button>
+        <div class="search-wrap">
+          <input class="player-search" id="playerSearch" type="text" placeholder="Search player…" oninput="onSearchInput(this.value)">
+          <button class="search-clear" id="searchClear" onclick="clearSearch()">×</button>
+        </div>
+        <div class="edge-mode-group">
+          <button class="edge-mode-btn active" id="btnRecommended" onclick="setEdgeMode('recommended')">Recommended</button>
+          <button class="edge-mode-btn"        id="btnAll"         onclick="setEdgeMode('all')">All</button>
+        </div>
         <div class="filter-tabs">
-          <button class="ftab pp-on" id="fPP" onclick="setFilter('PP')">PrizePicks</button>
-          <button class="ftab"       id="fUD" onclick="setFilter('UD')">Underdog</button>
+          <button class="ftab"    id="fAll" onclick="setFilter('all')">All</button>
+          <button class="ftab"    id="fPP"  onclick="setFilter('PP')">PrizePicks</button>
+          <button class="ftab"    id="fUD"  onclick="setFilter('UD')">Underdog</button>
+          <button class="ftab"    id="fUDM" onclick="setFilter('UDM')">UD Multipliers</button>
         </div>
       </div>
     </div>
-    <div class="col-headers">
+    <div class="col-headers" id="mainColHeaders">
       <div class="ch"></div>
       <div class="ch">Player</div>
       <div class="ch">O/U</div>
@@ -1014,6 +1106,26 @@ body {
     </div>
     <div class="edge-list" id="edgeList">
       <div class="loading"><div class="spin"></div> Loading edges...</div>
+    </div>
+    <!-- ── Underdog Multipliers (shown when UDM tab active) ── -->
+    <div id="multSection" style="display:none; overflow-y:auto; flex:1;">
+      <div class="mult-col-headers">
+        <div class="ch"></div>
+        <div class="ch">Player</div>
+        <div class="ch">O/U</div>
+        <div class="ch">Stat</div>
+        <div class="ch">Line</div>
+        <div class="ch c">Mult</div>
+        <div class="ch c">True% / UD%</div>
+        <div class="ch c">2-pick EV</div>
+        <div class="ch c">FD</div>
+        <div class="ch c">DK</div>
+        <div class="ch c">PIN</div>
+        <div class="ch c">MGM</div>
+        <div class="ch c">CAE</div>
+        <div class="ch c">PP</div>
+      </div>
+      <div id="multEdgeList"></div>
     </div>
   </div>
 
@@ -1088,18 +1200,20 @@ body {
   </div>
 </div>
 
+
 <div class="toast" id="toast"></div>
 
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
 let allEdges    = [];
-let filter      = 'PP';
+let filter      = 'all';
 let edgeMode    = 'recommended'; // 'recommended' | 'all'
 let selected    = [];
 let selectedMode = null; // 'power'/'flex' for PP, 'standard'/'flex' for UD
 let slipTab     = 'active';
 let yourSlips  = { active: [], settled: [] };
-let lastUpdate = null;
+let lastNbaUpdate = null;
+let lastMlbUpdate = null;
 
 const STAT_LABELS = {
   points: 'PTS', rebounds: 'REB', assists: 'AST', threes: '3PM',
@@ -1167,6 +1281,18 @@ function probClass(p, platform) {
   return 'prob-red';                       // more than 0.5% below breakeven
 }
 
+// For builder/slip legs: UD multiplier picks colored by EV contribution, not raw prob
+function legProbClass(e) {
+  if (e.platform === 'UD' && e.ud_mult && e.ud_mult !== 1.0) {
+    const BREAK_EVEN = Math.sqrt(1 / 3.5); // ≈ 0.5345
+    const ev = ((e.prob / 100) * e.ud_mult) / BREAK_EVEN - 1;
+    if (ev > 0)     return 'prob-green';
+    if (ev > -0.02) return 'prob-neutral';
+    return 'prob-red';
+  }
+  return probClass(e.prob, e.platform);
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function toast(msg, isError = false) {
   const el = document.getElementById('toast');
@@ -1175,18 +1301,33 @@ function toast(msg, isError = false) {
   setTimeout(() => el.className = 'toast', 2500);
 }
 
-function toggleAllEdges() {
-  edgeMode = edgeMode === 'recommended' ? 'all' : 'recommended';
-  const btn = document.getElementById('allToggle');
-  btn.className  = 'all-toggle' + (edgeMode === 'all' ? ' on' : '');
-  btn.textContent = edgeMode === 'all' ? 'Recommended Only' : 'Show All';
+function onSearchInput(val) {
+  const clear = document.getElementById('searchClear');
+  if (clear) clear.classList.toggle('show', val.length > 0);
+  renderEdges();
+}
+
+function clearSearch() {
+  const input = document.getElementById('playerSearch');
+  const clear = document.getElementById('searchClear');
+  if (input) input.value = '';
+  if (clear) clear.classList.remove('show');
+  renderEdges();
+}
+
+function setEdgeMode(mode) {
+  edgeMode = mode;
+  document.getElementById('btnRecommended').className = 'edge-mode-btn' + (mode === 'recommended' ? ' active' : '');
+  document.getElementById('btnAll').className         = 'edge-mode-btn' + (mode === 'all'         ? ' active' : '');
   renderEdges();
 }
 
 function setFilter(f) {
   filter = f;
-  document.getElementById('fPP').className = 'ftab' + (f === 'PP' ? ' pp-on' : '');
-  document.getElementById('fUD').className = 'ftab' + (f === 'UD' ? ' ud-on' : '');
+  document.getElementById('fAll').className = 'ftab' + (f === 'all' ? ' ud-on'  : '');
+  document.getElementById('fPP').className  = 'ftab' + (f === 'PP'  ? ' pp-on'  : '');
+  document.getElementById('fUD').className  = 'ftab' + (f === 'UD'  ? ' ud-on'  : '');
+  document.getElementById('fUDM').className = 'ftab' + (f === 'UDM' ? ' ud-on'  : '');
   const refHeader = document.getElementById('refHeader');
   if (refHeader) refHeader.textContent = f === 'PP' ? 'UD' : 'PP';
   renderEdges();
@@ -1213,6 +1354,8 @@ function calcEV() {
   const stake     = stakeForType(slipType);
   const jointProb = selected.reduce((acc, e) => acc * (e.prob / 100), 1);
   const isFlex    = slipType.endsWith('-flex');
+  // Product of all per-leg UD multipliers (1.0 for PP or flat UD lines)
+  const legMultFactor = selected.reduce((acc, e) => acc * (e.ud_mult ?? 1.0), 1);
   let ev, evPct, mult = null;
 
   if (isFlex) {
@@ -1221,16 +1364,16 @@ function calcEV() {
     let expected  = 0;
     for (const [hits, m] of Object.entries(payouts ?? {})) {
       const h = parseInt(hits);
-      expected += _comb(n, h) * Math.pow(pAvg, h) * Math.pow(1-pAvg, n-h) * m * stake;
+      expected += _comb(n, h) * Math.pow(pAvg, h) * Math.pow(1-pAvg, n-h) * m * legMultFactor * stake;
     }
     ev    = expected - stake;
     evPct = (ev / stake) * 100;
   } else {
-    mult  = platform === 'PP' ? PP_POWER_MULT[slipType] : UD_STANDARD_MULT[slipType];
+    mult  = (platform === 'PP' ? PP_POWER_MULT[slipType] : UD_STANDARD_MULT[slipType]) * legMultFactor;
     ev    = jointProb * stake * mult - stake;
     evPct = (ev / stake) * 100;
   }
-  return { jointProb, mult, ev, evPct, platform, slipType, stake, isFlex };
+  return { jointProb, mult, ev, evPct, platform, slipType, stake, isFlex, legMultFactor };
 }
 
 // ── Selection logic ────────────────────────────────────────────────────────
@@ -1282,11 +1425,12 @@ function clearAll() {
 
 // ── Edge count ─────────────────────────────────────────────────────────────
 function updateEdgeCount() {
+  const el = document.getElementById('edgeCount');
+  if (!el) return;
   const visible = allEdges.filter(e => e.has_sharp !== false);
   const pp = visible.filter(e => e.platform === 'PP').length;
   const ud = visible.filter(e => e.platform === 'UD').length;
-  document.getElementById('edgeCount').textContent =
-    `${visible.length} edge${visible.length !== 1 ? 's' : ''} · ${pp} PP · ${ud} UD`;
+  el.textContent = `${visible.length} edge${visible.length !== 1 ? 's' : ''} · ${pp} PP · ${ud} UD`;
 }
 
 // ── Render edges ───────────────────────────────────────────────────────────
@@ -1296,63 +1440,158 @@ function parseBk(val) {
   return { line: parts[0], odds: parts[1] || null };
 }
 
+// UD implied probability from UD's American price
+function udImplied(price) {
+  if (price == null) return null;
+  const p = parseInt(price);
+  if (isNaN(p)) return null;
+  return p > 0 ? (100 / (p + 100)) * 100 : (Math.abs(p) / (Math.abs(p) + 100)) * 100;
+}
+
 function renderEdges() {
   updateEdgeCount();
   const locked = lockedPlatform();
   let edges = edgeMode === 'recommended' ? allEdges.filter(e => e.has_sharp !== false) : allEdges;
-  if (filter !== 'all') edges = edges.filter(e => e.platform === filter);
-  const sorted = [...edges].sort((a, b) => b.prob - a.prob);
-  const el = document.getElementById('edgeList');
+  const searchQ = (document.getElementById('playerSearch')?.value || '').trim().toLowerCase();
+  if (searchQ) edges = edges.filter(e => e.player.toLowerCase().includes(searchQ));
 
-  if (!sorted.length) {
+  // Split: flat edges (PP + flat UD) vs UD multiplier edges (ud_mult != 1.0)
+  // UDM tab always uses all UD multiplier edges regardless of edgeMode/has_sharp
+  let flatEdges, multEdges;
+  if (filter === 'UDM') {
+    flatEdges = [];
+    multEdges = edges.filter(e => e.platform === 'UD' && e.ud_mult && e.ud_mult !== 1.0);
+  } else {
+    const filtered = filter !== 'all' ? edges.filter(e => e.platform === filter) : edges;
+    flatEdges = filtered.filter(e => e.platform !== 'UD' || !e.ud_mult || e.ud_mult === 1.0);
+    multEdges = [];
+  }
+
+  const sorted     = [...flatEdges].sort((a, b) => b.prob - a.prob);
+  // Sort multiplier edges by (true prob − UD implied prob) descending — biggest edge first
+  const BREAK_EVEN = Math.sqrt(1 / 3.5);
+  const multSorted = [...multEdges].sort((a, b) => {
+    const evA = ((a.prob / 100) * (a.ud_mult || 1.0)) / BREAK_EVEN - 1;
+    const evB = ((b.prob / 100) * (b.ud_mult || 1.0)) / BREAK_EVEN - 1;
+    return evB - evA;
+  });
+
+  const el      = document.getElementById('edgeList');
+  const multEl  = document.getElementById('multEdgeList');
+  const multSec = document.getElementById('multSection');
+
+  const refKey = (filter === 'UD' || filter === 'UDM') ? 'prizepicks' : 'underdog';
+
+  // UDM tab: hide main table, show mult section inline
+  const colHeaders = document.getElementById('mainColHeaders');
+  if (filter === 'UDM') {
+    el.style.display = 'none';
+    if (colHeaders) colHeaders.style.display = 'none';
+    multSec.style.display = 'flex';
+    multSec.style.flexDirection = 'column';
+  } else {
+    el.style.display = '';
+    if (colHeaders) colHeaders.style.display = '';
+    multSec.style.display = 'none';
+  }
+
+  if (!sorted.length && !multSorted.length) {
     el.innerHTML = '<div class="empty"><div class="e-title">No edges right now</div><div class="e-sub">Check back closer to tip-off</div></div>';
     return;
   }
 
-  const refKey  = filter === 'UD' ? 'prizepicks' : 'underdog';
+  const bk = (b) => b
+    ? `<div class="c-bk"><div class="bk-line">${b.line}</div>${b.odds ? `<div class="bk-odds">${b.odds}</div>` : ''}</div>`
+    : `<div class="c-bk na">—</div>`;
 
-  el.innerHTML = sorted.map(e => {
+  const _isTuesday = new Date().getDay() === 2;
+  function promoEmoji(e) {
+    const isPromo   = !!e.is_promo;
+    const isFreebie = e.platform_line === 0.5 && e.prob >= 90;
+    if (_isTuesday && isPromo) return '🌮';
+    if (isFreebie)             return '🤑';
+    if (isPromo)               return '⚡';
+    return '';
+  }
+
+  function renderRow(e, extraClass) {
     const isSelected = selected.some(s => s.player === e.player && s.stat === e.stat && s.direction === e.direction && s.platform === e.platform);
     const isDimmed   = locked && e.platform !== locked && !isSelected;
-
-    const statLabel = STAT_LABELS[e.stat] || e.stat.toUpperCase();
-    const dirWord   = e.direction === 'OVER' ? 'Over' : 'Under';
-    const dirClass  = e.direction === 'OVER' ? 'pick-over' : 'pick-under';
-    const pClass    = probClass(e.prob, e.platform);
-
+    const statLabel  = STAT_LABELS[e.stat] || e.stat.toUpperCase();
+    const dirWord    = e.direction === 'OVER' ? 'Over' : 'Under';
+    const dirClass   = e.direction === 'OVER' ? 'pick-over' : 'pick-under';
+    const pClass     = probClass(e.prob, e.platform);
     const fd  = parseBk(e.fd);
     const dk  = parseBk(e.dk);
     const pin = parseBk(e.pin);
     const mgm = parseBk(e.mgm);
     const cae = parseBk(e.cae);
     const ref = parseBk(e[refKey]);
-
-    const bk = (b) => b
-      ? `<div class="c-bk"><div class="bk-line">${b.line}</div>${b.odds ? `<div class="bk-odds">${b.odds}</div>` : ''}</div>`
-      : `<div class="c-bk na">—</div>`;
     const injHtml = e.injury_status ? `<span class="inj-tag">${e.injury_status.toUpperCase()}</span>` : '';
     const sub = [e.matchup, e.team].filter(Boolean).join(' · ');
+    const classes = ['edge-row', e.platform.toLowerCase(), extraClass || '', isSelected ? 'selected' : '', isDimmed ? 'dimmed' : ''].filter(Boolean).join(' ');
+    return { isSelected, isDimmed, statLabel, dirWord, dirClass, pClass, fd, dk, pin, mgm, cae, ref, injHtml, sub, classes };
+  }
 
-    const classes = ['edge-row', e.platform.toLowerCase(), isSelected ? 'selected' : '', isDimmed ? 'dimmed' : ''].filter(Boolean).join(' ');
+  // ── Main table ────────────────────────────────────────────────────
+  if (!sorted.length) {
+    el.innerHTML = '<div class="empty"><div class="e-title">No edges right now</div><div class="e-sub">Check back closer to tip-off</div></div>';
+  } else {
+    el.innerHTML = sorted.map(e => {
+      const r = renderRow(e, '');
+      const emoji = promoEmoji(e);
+      return `<div class="${r.classes}" onclick="toggleSelect(${JSON.stringify(e).replace(/"/g, '&quot;')})">
+        <div class="c-check"><svg class="check-mark" width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3 5.5L8 1" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="c-player"><div class="c-player-name">${e.player}${emoji ? ' <span style="font-style:normal">' + emoji + '</span>' : ''}</div><div class="c-player-tags"><span class="stag">${r.sub}</span>${r.injHtml}</div></div>
+        <div class="c-ou"><span class="${r.dirClass}">${r.dirWord}</span></div>
+        <div class="c-stat">${r.statLabel}</div>
+        <div class="c-line">${e.platform_line}</div>
+        <div class="c-prob-cell ${r.pClass}">${e.prob}%</div>
+        ${bk(r.fd)}${bk(r.dk)}${bk(r.pin)}${bk(r.mgm)}${bk(r.cae)}
+        ${r.ref ? `<div class="c-ref"><div class="bk-line">${r.ref.line}</div>${r.ref.odds ? `<div class="bk-odds">${r.ref.odds}</div>` : ''}</div>` : `<div class="c-ref na">—</div>`}
+      </div>`;
+    }).join('');
+  }
 
-    return `<div class="${classes}" onclick="toggleSelect(${JSON.stringify(e).replace(/"/g, '&quot;')})">
-      <div class="c-check">
-        <svg class="check-mark" width="9" height="7" viewBox="0 0 9 7" fill="none">
-          <path d="M1 3.5L3 5.5L8 1" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <div class="c-player">
-        <div class="c-player-name">${e.player}</div>
-        <div class="c-player-tags"><span class="stag">${sub}</span>${injHtml}</div>
-      </div>
-      <div class="c-ou"><span class="${dirClass}">${dirWord}</span></div>
-      <div class="c-stat">${statLabel}</div>
-      <div class="c-line">${e.platform_line}</div>
-      <div class="c-prob-cell ${pClass}">${e.prob}%</div>
-      ${bk(fd)}${bk(dk)}${bk(pin)}${bk(mgm)}${bk(cae)}
-      ${ref ? `<div class="c-ref"><div class="bk-line">${ref.line}</div>${ref.odds ? `<div class="bk-odds">${ref.odds}</div>` : ''}</div>` : `<div class="c-ref na">—</div>`}
-    </div>`;
-  }).join('');
+  // ── Multiplier table ──────────────────────────────────────────────
+  if (multSorted.length) {
+    multEl.innerHTML = multSorted.map(e => {
+      const r = renderRow(e, 'mult-row');
+      const mult      = e.ud_mult || 1.0;
+      const multClass = mult > 1.0 ? 'm-up' : mult < 1.0 ? 'm-down' : 'm-flat';
+      const multLabel = mult.toFixed(2) + 'x';
+      const udImp     = udImplied(e.ud_price);
+      const udImpStr  = udImp != null ? udImp.toFixed(1) + '%' : '—';
+      // 2-pick EV: how much this leg improves/hurts a 2-leg 3.5x slip
+      // Formula: ((p × m) / breakEven - 1) × 100, where breakEven = sqrt(1/3.5) ≈ 0.535
+      const p         = e.prob / 100;
+      const m         = e.ud_mult || 1.0;
+      const BREAK_EVEN = Math.sqrt(1 / 3.5);   // ≈ 0.5345
+      const ev2pick   = ((p * m) / BREAK_EVEN - 1) * 100;
+      const hasValue  = ev2pick != null && ev2pick > 0;
+      const dualClass = hasValue ? 'prob-green' : 'prob-red';
+      const pevClass  = hasValue ? 'pev-pos' : 'pev-neg';
+      const pevStr    = ev2pick != null ? `${ev2pick >= 0 ? '+' : ''}${ev2pick.toFixed(1)}%` : '—';
+      const emoji = promoEmoji(e);
+      return `<div class="${r.classes}" onclick="toggleSelect(${JSON.stringify(e).replace(/"/g, '&quot;')})">
+        <div class="c-check"><svg class="check-mark" width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3 5.5L8 1" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="c-player"><div class="c-player-name">${e.player}${emoji ? ' <span style="font-style:normal">' + emoji + '</span>' : ''}</div><div class="c-player-tags"><span class="stag">${r.sub}</span>${r.injHtml}</div></div>
+        <div class="c-ou"><span class="${r.dirClass}">${r.dirWord}</span></div>
+        <div class="c-stat">${r.statLabel}</div>
+        <div class="c-line">${e.platform_line}</div>
+        <div class="c-mult ${multClass}">${multLabel}</div>
+        <div class="c-prob-dual ${dualClass}">
+          <div class="pd-true ${dualClass}">${e.prob}%</div>
+          <div class="pd-ud">UD ${udImpStr}</div>
+        </div>
+        <div class="c-pev ${pevClass}">${pevStr}</div>
+        ${bk(r.fd)}${bk(r.dk)}${bk(r.pin)}${bk(r.mgm)}${bk(r.cae)}
+        ${r.ref ? `<div class="c-ref"><div class="bk-line">${r.ref.line}</div>${r.ref.odds ? `<div class="bk-odds">${r.ref.odds}</div>` : ''}</div>` : `<div class="c-ref na">—</div>`}
+      </div>`;
+    }).join('');
+  } else {
+    multEl.innerHTML = '<div class="empty"><div class="e-title">No multiplier edges right now</div></div>';
+  }
 }
 
 // ── Render builder ─────────────────────────────────────────────────────────
@@ -1382,7 +1621,7 @@ function renderBuilder() {
   slots.innerHTML = selected.map((e, i) => {
     const statLabel = STAT_LABELS[e.stat] || e.stat.toUpperCase();
     const dirWord   = e.direction === 'OVER' ? 'Over' : 'Under';
-    const pClass    = probClass(e.prob, e.platform);
+    const pClass    = legProbClass(e);
     return `<div class="leg-item">
       <div class="leg-num">${i + 1}</div>
       <div class="leg-info">
@@ -1469,8 +1708,12 @@ function renderBuilder() {
       document.getElementById('evMultiplier').style.fontSize = '10px';
     } else {
       document.getElementById('evMultLabel').textContent   = 'Multiplier';
-      document.getElementById('evMultiplier').textContent  = `${ev.mult}x`;
-      document.getElementById('evMultiplier').style.fontSize = '';
+      const baseMult = ev.mult / ev.legMultFactor;
+      const multStr  = ev.legMultFactor !== 1.0
+        ? `${baseMult.toFixed(1)} × ${ev.legMultFactor.toFixed(3)} = ${ev.mult.toFixed(4)}x`
+        : `${ev.mult.toFixed(1)}x`;
+      document.getElementById('evMultiplier').textContent  = multStr;
+      document.getElementById('evMultiplier').style.fontSize = ev.legMultFactor !== 1.0 ? '10px' : '';
     }
     document.getElementById('evStake').textContent      = `$${ev.stake.toFixed(2)}`;
     document.getElementById('evValue').className        = evClass;
@@ -1622,25 +1865,40 @@ function renderSlips() {
 }
 
 // ── Fetch ──────────────────────────────────────────────────────────────────
+function _agoText(ts) {
+  if (!ts) return null;
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return null;
+  const mins = Math.floor((Date.now() - d) / 60000);
+  return mins < 1 ? 'just now' : `${mins}m ago`;
+}
+
+function updateSportBadges() {
+  const nbaMins = lastNbaUpdate ? Math.floor((Date.now() - lastNbaUpdate) / 60000) : null;
+  const mlbMins = lastMlbUpdate ? Math.floor((Date.now() - lastMlbUpdate) / 60000) : null;
+  const nbaEl = document.getElementById('nbaRefreshBadge');
+  const mlbEl = document.getElementById('mlbRefreshBadge');
+  if (nbaEl && nbaMins !== null) {
+    nbaEl.textContent = nbaMins < 1 ? 'NBA just now' : `NBA ${nbaMins}m ago`;
+    nbaEl.className   = nbaMins > 20 ? 'refresh-badge stale' : 'refresh-badge';
+  }
+  if (mlbEl && mlbMins !== null) {
+    mlbEl.textContent = mlbMins < 1 ? 'MLB just now' : `MLB ${mlbMins}m ago`;
+    mlbEl.className   = mlbMins > 30 ? 'refresh-badge stale' : 'refresh-badge';
+  }
+}
+
 async function fetchEdges() {
   try {
     const resp = await (await fetch('/api/edges')).json();
     allEdges = resp.edges || resp; // support old list format
-    const bookAges   = resp.book_ages   || {};
     const staleBooks = new Set(resp.stale_books || []);
 
+    if (resp.nba_updated_at) lastNbaUpdate = new Date(resp.nba_updated_at);
+    if (resp.mlb_updated_at) lastMlbUpdate = new Date(resp.mlb_updated_at);
+    updateSportBadges();
+
     updateEdgeCount();
-
-    // Render per-book freshness pills
-    const bookLabels = { fanduel: 'FD', betmgm: 'MGM', draftkings: 'DK', caesars: 'CAE' };
-    const freshnessEl = document.getElementById('bookFreshness');
-    if (freshnessEl && Object.keys(bookAges).length) {
-      const pills = ['PIN', 'FD', 'DK', 'MGM', 'CAE'].map(label =>
-        `<span class="bf-pill">${label}</span>`
-      );
-      freshnessEl.innerHTML = pills.join('');
-    }
-
     renderEdges();
   } catch {
     document.getElementById('edgeList').innerHTML = '<div class="empty"><div class="e-title">Connection error</div></div>';
@@ -1684,23 +1942,6 @@ async function fetchYourSlips() {
   } catch {}
 }
 
-async function fetchLastUpdate() {
-  try {
-    const text = await (await fetch('/api/last_update')).text();
-    const el   = document.getElementById('refreshBadge');
-    if (text && text !== '—') {
-      lastUpdate = new Date(text);
-      if (isNaN(lastUpdate.getTime())) {
-        el.textContent = `Updated ${text}`;
-        el.className   = 'refresh-badge';
-      } else {
-        const mins = Math.floor((Date.now() - lastUpdate) / 60000);
-        el.textContent = mins < 1 ? 'Updated just now' : `Updated ${mins}m ago`;
-        el.className   = mins > 30 ? 'refresh-badge stale' : 'refresh-badge';
-      }
-    }
-  } catch {}
-}
 
 function updateTs() {
   document.getElementById('ts').textContent =
@@ -1708,20 +1949,16 @@ function updateTs() {
 }
 
 async function refresh() {
-  await Promise.all([fetchEdges(), fetchYourSlips(), fetchLastUpdate()]);
+  await Promise.all([fetchEdges(), fetchYourSlips()]);
   updateTs();
 }
 
 setInterval(() => {
-  if (lastUpdate) {
-    const mins = Math.floor((Date.now() - lastUpdate) / 60000);
-    const el   = document.getElementById('refreshBadge');
-    el.textContent = mins < 1 ? 'Updated just now' : `Updated ${mins}m ago`;
-    el.className   = mins > 30 ? 'refresh-badge stale' : 'refresh-badge';
-  }
+  updateSportBadges();
   updateTs();
-}, 60000);
+}, 30000);
 
+setFilter('all');
 refresh();
 setInterval(refresh, 600000);
 
@@ -1841,9 +2078,17 @@ async function confirmSettle() {
   }
 }
 
-// Close modal on overlay click
-document.getElementById('settleModal').addEventListener('click', function(e) {
+// Close modal on overlay click or Escape
+const _settleModal = document.getElementById('settleModal');
+if (_settleModal) _settleModal.addEventListener('click', function(e) {
   if (e.target === this) closeSettle();
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const settleEl = document.getElementById('settleModal');
+  if (settleEl?.classList.contains('open')) closeSettle();
+  const videoEl = document.getElementById('videoModal');
+  if (videoEl?.style.display === 'flex') closeVideoModal();
 });
 
 // ── Overview video modal ───────────────────────────────────────────────────
@@ -1896,7 +2141,7 @@ async function toggleNotifications() {
     } catch(e) { console.warn('Unsubscribe error:', e); }
     localStorage.removeItem(NOTIF_KEY);
     btn.textContent = '🔔 Notify';
-    btn.style.color = 'var(--text-4)';
+    btn.classList.remove('on');
     toast('Notifications off');
     return;
   }
@@ -1932,7 +2177,7 @@ async function toggleNotifications() {
 
     localStorage.setItem(NOTIF_KEY, '1');
     btn.textContent = '🔔 On';
-    btn.style.color = 'var(--green)';
+    btn.classList.add('on');
     toast('Notifications enabled');
   } catch(e) {
     console.error('Push subscribe error:', e);
@@ -1947,12 +2192,39 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
 }
 
+// ── Taco Tuesday ──────────────────────────────────────────────────────────────
+(function() {
+  const today = new Date();
+  if (today.getDay() !== 2) return; // Not Tuesday
+  // Sombrero (already in DOM)
+  const sombrero = document.getElementById('sombrero');
+  if (sombrero) sombrero.style.display = 'block';
+  // Mariachi — once per Tuesday session; defer so overlay div is in the DOM
+  const tacoKey = 'tacoTuesdayShown_' + today.toISOString().slice(0, 10);
+  if (sessionStorage.getItem(tacoKey)) return;
+  // Wait for splash to finish on first page-load; splash removes itself after ~2700ms
+  // We always delay 2800ms since this key only triggers once per day anyway
+  setTimeout(() => {
+    const overlay = document.getElementById('tacoOverlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    sessionStorage.setItem(tacoKey, '1');
+    const dismiss = () => {
+      overlay.style.transition = 'opacity 350ms ease';
+      overlay.style.opacity = '0';
+      setTimeout(() => { overlay.style.display = 'none'; overlay.style.opacity = ''; overlay.style.transition = ''; }, 360);
+    };
+    setTimeout(dismiss, 3200);
+    overlay.addEventListener('click', dismiss, { once: true });
+  }, 2800);
+})();
+
 // Restore button state on load
 (async function initNotifBtn() {
   const btn = document.getElementById('notifBtn');
   if (localStorage.getItem(NOTIF_KEY) === '1') {
     btn.textContent = '🔔 On';
-    btn.style.color = 'var(--green)';
+    btn.classList.add('on');
     // Re-register SW silently so subscription stays active
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/static/sw.js').catch(() => {});
@@ -1960,6 +2232,16 @@ function urlBase64ToUint8Array(base64String) {
   }
 })();
 </script>
+
+<!-- Taco Tuesday overlay -->
+<div id="tacoOverlay">
+  <div class="mariachi-left">🎺🥁</div>
+  <div class="taco-center">
+    <div class="taco-emoji">🌮</div>
+    <div class="taco-label">TACO TUESDAY</div>
+  </div>
+  <div class="mariachi-right">🎸🎷</div>
+</div>
 
 <!-- Settle modal -->
 <div class="modal-overlay" id="settleModal">
