@@ -346,6 +346,15 @@ def your_bets_page():
     return resp
 
 
+@app.route("/tracker")
+@login_required
+def tracker_page():
+    resp = make_response(render_template("tracker.html"))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
 @app.route("/autopilot")
 def autopilot_page():
     resp = make_response(render_template("bets.html"))
