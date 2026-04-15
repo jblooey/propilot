@@ -907,13 +907,27 @@ function probClass(p, platform) {
 }
 
 // ── Sport detection ───────────────────────────────────────────────────────
-const MLB_STAT_WORDS = ['HITS','RBIS','HOME RUNS','TOTAL BASES','PITCHER STRIKEOUTS',
-  'PITCHING OUTS','HITS ALLOWED','EARNED RUNS','WALKS ALLOWED','PITCHES THROWN',
-  'BATTER STRIKEOUTS','STOLEN BASES','SINGLES','DOUBLES','TRIPLES','WALKS'];
+// MLB stats appear both space-separated and underscore-separated in detail strings
+const MLB_STAT_WORDS = [
+  'HITS','RBIS','HOME_RUNS','HOME RUNS','TOTAL_BASES','TOTAL BASES',
+  'PITCHER_STRIKEOUTS','PITCHER STRIKEOUTS','PITCHING_OUTS','PITCHING OUTS',
+  'HITS_ALLOWED','HITS ALLOWED','EARNED_RUNS','EARNED RUNS',
+  'WALKS_ALLOWED','WALKS ALLOWED','PITCHES_THROWN','PITCHES THROWN',
+  'BATTER_STRIKEOUTS','BATTER STRIKEOUTS','STOLEN_BASES','STOLEN BASES',
+  'SINGLES','DOUBLES','TRIPLES','WALKS','RUNS',
+  'HITS_RUNS_RBIS','HITS RUNS RBIS',
+];
+const NBA_STAT_WORDS = new Set(['POINTS','REBOUNDS','ASSISTS','3PM','PRA','PR','PA','RA',
+  'BLOCKED SHOTS','STEALS','TURNOVERS','BLK','STL','TO','BS']);
 function detectSport(detail) {
   if (!detail) return 'NBA';
   const u = detail.toUpperCase();
-  return MLB_STAT_WORDS.some(k => u.includes(k)) ? 'MLB' : 'NBA';
+  // Everything after "OVER/UNDER <line>" is the stat
+  const parts = u.split(' ');
+  const statPart = parts.slice(2).join(' ');  // e.g. "PITCHER_STRIKEOUTS" or "POINTS"
+  if (NBA_STAT_WORDS.has(statPart)) return 'NBA';
+  if (MLB_STAT_WORDS.some(k => u.includes(k))) return 'MLB';
+  return 'NBA'; // default
 }
 
 // ── Analytics accordion ───────────────────────────────────────────────────
@@ -930,11 +944,13 @@ function toggleAnalytics() {
 function renderAnalytics(results) {
   const settled = (results || []).filter(s => s.result && s.result !== 'refund');
 
+  // Keys must match formatType() output exactly — no hyphens in "Pick"
   const BE_MAP = {
-    'PP 3-Pick Power': 16.7, 'PP 3-Pick Flex': 16.7,
-    'PP 6-Pick Flex':  40.0, 'PP 5-Pick Flex': 25.0,
-    'PP 4-Pick Flex':  25.0, 'PP 2-Pick Power': 33.3,
-    'UD 2-Pick Power': 28.6, 'UD 3-Pick Power': 15.4,
+    'PP 2 Pick Power': 33.3,
+    'PP 3 Pick Power': 16.7,
+    'UD 2 Pick Power': 28.6,
+    'UD 3 Pick Power': 15.4,
+    // Flex payouts vary (partial paybacks possible) — show break-even only for full-power
   };
 
   const typeMap  = {};
@@ -943,12 +959,16 @@ function renderAnalytics(results) {
   for (const s of settled) {
     const typeKey = `${s.platform} ${formatType(s.type)}`;
     if (!typeMap[typeKey]) typeMap[typeKey] = { h:0, m:0, platform: s.platform };
-    if (s.result.startsWith('hit')) typeMap[typeKey].h++;
+
+    // A "win" is only when profit > 0 — catches flex partial losses (e.g. 4/6 = 0.4x payout)
+    const profit  = s.profit != null ? parseFloat(s.profit) : null;
+    const isWin   = profit != null && profit > 0;
+    if (isWin) typeMap[typeKey].h++;
     else typeMap[typeKey].m++;
 
     const isMlb = (s.details || []).some(d => detectSport(d) === 'MLB');
     const sport = isMlb ? 'MLB' : 'NBA';
-    if (s.result.startsWith('hit')) sportMap[sport].h++;
+    if (isWin) sportMap[sport].h++;
     else sportMap[sport].m++;
   }
 
@@ -1012,7 +1032,7 @@ function renderAnalytics(results) {
   }
   const recent = [...settled].filter(s => s.settled_at).sort((a,b) => b.settled_at.localeCompare(a.settled_at)).slice(0,5);
   if (recent.length >= 3) {
-    const rh = recent.filter(s => s.result.startsWith('hit')).length;
+    const rh = recent.filter(s => s.profit != null && parseFloat(s.profit) > 0).length;
     const dot = rh >= recent.length * 0.6 ? 'g' : rh <= recent.length * 0.3 ? 'r' : 'n';
     html += `<div class="an-insight"><span class="an-insight-dot ${dot}"></span><span>Recent form: <strong>${rh}/${recent.length}</strong> last ${recent.length} settled</span></div>`;
   }
@@ -1502,7 +1522,7 @@ async function fetchSlips() {
     renderAnalytics(d.settled || []);
 
     // Compat: sbRefunds
-    const refunds = settled.filter(s => s.result === 'refund').length;
+    const refunds = (d.settled || []).filter(s => s.result === 'refund').length;
     const sbRefEl = document.getElementById('sbRefunds');
     if (sbRefEl) sbRefEl.textContent = refunds || '—';
 
