@@ -12,3 +12,8 @@ last_update.txt
 .agents/
 templates/logo_preview.html
 templates/downtime.html
+users.json
+pp_props_cache.json
+pp_mlb_props_cache.json
+vapid_private.pem
+stat={s!r}
