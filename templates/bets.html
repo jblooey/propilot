@@ -359,116 +359,125 @@ body {
 
 /* Left platform panel */
 .dg-plat {
-  width: 110px; flex-shrink: 0;
-  padding: 16px 10px;
+  width: 130px; flex-shrink: 0;
+  padding: 20px 12px;
   border-right: 1px solid var(--border);
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  gap: 7px;
-  background: rgba(0,0,0,0.18);
+  gap: 8px;
+  background: rgba(0,0,0,0.20);
 }
-.dg-plat svg, .dg-plat img { width: 52px; height: 52px; border-radius: 10px; display: block; }
+.dg-plat svg, .dg-plat img { width: 60px; height: 60px; border-radius: 12px; display: block; }
 .dg-stake {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 15px; font-weight: 700; color: var(--text-1);
+  font-size: 18px; font-weight: 700; color: var(--text-1);
   letter-spacing: -0.02em;
 }
-.dg-plat-name { font-size: 10px; font-weight: 600; color: var(--text-3); text-align: center; line-height: 1.3; }
-.dg-type-lbl  { font-size: 9px; color: var(--text-4); text-align: center; }
+.dg-plat-name { font-size: 11px; font-weight: 600; color: var(--text-3); text-align: center; line-height: 1.3; }
+.dg-type-lbl  { font-size: 10px; color: var(--text-4); text-align: center; }
 
-/* Table area */
+/* Table area — 5 columns: Match | Player | Stat | Line | O/U */
 .dg-tbl { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .dg-hrow {
   display: grid;
-  grid-template-columns: 80px 1fr 68px 118px;
-  padding: 5px 12px;
-  gap: 8px;
+  grid-template-columns: 96px 1fr 120px 72px 140px;
+  padding: 7px 16px;
+  gap: 12px;
   border-bottom: 1px solid var(--border);
   background: rgba(0,0,0,0.15);
+  align-items: center;
 }
 .dg-th {
-  font-size: 9px; font-weight: 600; text-transform: uppercase;
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.08em; color: var(--text-4);
   font-family: 'JetBrains Mono', monospace;
 }
 .dg-row {
   display: grid;
-  grid-template-columns: 80px 1fr 68px 118px;
-  padding: 9px 12px;
-  gap: 8px;
+  grid-template-columns: 96px 1fr 120px 72px 140px;
+  padding: 13px 16px;
+  gap: 12px;
   border-bottom: 1px solid var(--border);
   align-items: center;
 }
 .dg-row:last-of-type { border-bottom: none; }
-.dg-row.hit  { background: rgba(34,197,94,0.03); }
-.dg-row.miss { background: rgba(239,68,68,0.03); }
+.dg-row.hit  { background: rgba(34,197,94,0.04); }
+.dg-row.miss { background: rgba(239,68,68,0.04); }
 
 /* Match cell */
-.dg-match { display: flex; flex-direction: column; gap: 3px; }
+.dg-match { display: flex; flex-direction: column; gap: 4px; }
 .dg-league {
-  font-size: 8px; font-weight: 700; letter-spacing: 0.07em;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.07em;
   color: var(--text-4); border: 1px solid var(--border-2);
-  padding: 1px 4px; border-radius: 3px;
+  padding: 1px 5px; border-radius: 3px;
   font-family: 'JetBrains Mono', monospace;
   display: inline-block; width: fit-content;
 }
-.dg-matchup { font-size: 10px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dg-matchup strong { color: var(--text-2); font-weight: 600; }
+.dg-matchup { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dg-matchup strong { color: var(--text-2); font-weight: 700; }
 
 /* Player cell */
-.dg-pcol { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.dg-pname { font-size: 13px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dg-pcol { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dg-pname { font-size: 15px; font-weight: 700; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dg-pname.hit  { color: var(--green); }
-.dg-pname.miss { color: var(--red); opacity: 0.8; }
+.dg-pname.miss { color: var(--red); opacity: 0.85; }
 .dg-pname.void { color: var(--text-4); }
-.dg-pprob { font-size: 10px; font-family: 'JetBrains Mono', monospace; }
+.dg-pprob { font-size: 11px; font-family: 'JetBrains Mono', monospace; }
 .psc-delta { font-size: 10px; font-weight: 600; }
 .psc-delta.up { color: var(--green); }
 .psc-delta.dn { color: var(--red); }
 .psc-delta.fl { color: var(--text-4); }
 
-/* Prop cell */
-.dg-prop { display: flex; align-items: center; }
-.dg-prop-name { font-size: 11px; font-weight: 500; color: var(--text-2); }
+/* Stat cell */
+.dg-stat { display: flex; align-items: center; }
+.dg-stat-name { font-size: 13px; font-weight: 600; color: var(--text-2); }
+
+/* Line cell */
+.dg-line { display: flex; align-items: center; }
+.dg-lineval {
+  font-size: 18px; font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-1); letter-spacing: -0.02em;
+}
 
 /* O/U cell */
-.dg-ou { display: flex; flex-direction: column; gap: 4px; }
-.dg-lineval { font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--text-2); }
-.dg-btns { display: flex; gap: 4px; }
+.dg-ou { display: flex; flex-direction: column; gap: 6px; }
+.dg-btns { display: flex; gap: 6px; }
 .dg-btn {
-  padding: 4px 10px;
-  font-size: 11px; font-weight: 600;
-  border-radius: var(--r-sm);
+  flex: 1; padding: 7px 0; text-align: center;
+  font-size: 12px; font-weight: 600;
+  border-radius: var(--r);
   border: 1px solid var(--border-2);
   background: var(--surface-2);
   color: var(--text-4);
   cursor: default;
   font-family: 'Inter', sans-serif;
+  min-width: 56px;
 }
 .dg-btn.on          { background: rgba(34,197,94,0.14); border-color: var(--green-border); color: var(--green); }
-.dg-btn.on.hit      { background: var(--green-dim); border-color: var(--green-border); color: var(--green); }
-.dg-btn.on.miss     { background: var(--red-dim);   border-color: var(--red-border);   color: var(--red); }
+.dg-btn.on.hit      { background: var(--green-dim);     border-color: var(--green-border); color: var(--green); }
+.dg-btn.on.miss     { background: var(--red-dim);       border-color: var(--red-border);   color: var(--red); }
 .dg-btn.on.void     { background: rgba(113,113,122,0.12); border-color: rgba(113,113,122,0.30); color: #71717a; }
 
 /* Right %EV panel */
 .dg-ev {
-  width: 82px; flex-shrink: 0;
+  width: 100px; flex-shrink: 0;
   border-left: 1px solid var(--border);
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  gap: 3px; padding: 10px 6px;
-  background: rgba(0,0,0,0.18);
+  gap: 4px; padding: 12px 8px;
+  background: rgba(0,0,0,0.20);
 }
 .dg-ev-val {
-  font-size: 16px; font-weight: 700;
+  font-size: 20px; font-weight: 700;
   font-family: 'JetBrains Mono', monospace;
-  letter-spacing: -0.02em; text-align: center; line-height: 1;
+  letter-spacing: -0.03em; text-align: center; line-height: 1;
 }
 .dg-ev-val.pos { color: var(--green); }
 .dg-ev-val.neg { color: var(--red); }
 .dg-ev-val.neu { color: var(--text-3); }
 .dg-ev-lbl {
-  font-size: 8px; font-weight: 600; text-transform: uppercase;
+  font-size: 9px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.1em; color: var(--text-4);
   font-family: 'JetBrains Mono', monospace;
 }
@@ -663,14 +672,16 @@ body {
   .stat-card { min-width: 130px; flex-shrink: 0; }
 
   .slips-section { padding: 10px 14px 20px; }
-  .dg-plat { width: 80px; padding: 12px 6px; }
-  .dg-plat svg, .dg-plat img { width: 38px; height: 38px; }
-  .dg-stake { font-size: 13px; }
-  .dg-hrow, .dg-row { grid-template-columns: 60px 1fr 52px 90px; font-size: 10px; padding: 7px 8px; gap: 5px; }
-  .dg-pname { font-size: 12px; }
-  .dg-ev { width: 64px; }
-  .dg-ev-val { font-size: 13px; }
-  .dg-btn { padding: 3px 7px; font-size: 10px; }
+  .dg-plat { width: 90px; padding: 12px 8px; }
+  .dg-plat svg, .dg-plat img { width: 44px; height: 44px; }
+  .dg-stake { font-size: 14px; }
+  .dg-hrow, .dg-row { grid-template-columns: 58px 1fr 72px 44px 96px; padding: 9px 10px; gap: 8px; }
+  .dg-pname { font-size: 13px; }
+  .dg-lineval { font-size: 14px; }
+  .dg-stat-name { font-size: 11px; }
+  .dg-ev { width: 72px; }
+  .dg-ev-val { font-size: 15px; }
+  .dg-btn { font-size: 11px; padding: 6px 0; min-width: 40px; }
 }
 </style>
 </head>
@@ -1455,11 +1466,13 @@ function renderSlipCard(s) {
         <div class="dg-pname ${lrCls}">${player}${sym}</div>
         <div class="dg-pprob ${probClass(prob, s.platform)}">${prob}% <span class="psc-delta ${dc}">${ds}</span></div>
       </div>
-      <div class="dg-prop">
-        <span class="dg-prop-name">${statDisp}</span>
+      <div class="dg-stat">
+        <span class="dg-stat-name">${statDisp}</span>
+      </div>
+      <div class="dg-line">
+        <span class="dg-lineval">${lineVal}</span>
       </div>
       <div class="dg-ou">
-        <div class="dg-lineval">${lineVal}</div>
         <div class="dg-btns">
           <button class="${moreCls}">More</button>
           <button class="${lessCls}">Less</button>
@@ -1504,8 +1517,9 @@ function renderSlipCard(s) {
         <div class="dg-hrow">
           <div class="dg-th">Match</div>
           <div class="dg-th">Player Name</div>
-          <div class="dg-th">Prop</div>
-          <div class="dg-th">O/U</div>
+          <div class="dg-th">Stat</div>
+          <div class="dg-th">Line</div>
+          <div class="dg-th">O / U</div>
         </div>
         ${legRows}
       </div>
