@@ -1083,7 +1083,6 @@ body {
           <button class="edge-mode-btn"        id="btnAll"         onclick="setEdgeMode('all')">All</button>
         </div>
         <div class="filter-tabs">
-          <button class="ftab"    id="fAll" onclick="setFilter('all')">All</button>
           <button class="ftab"    id="fPP"  onclick="setFilter('PP')">PrizePicks</button>
           <button class="ftab"    id="fUD"  onclick="setFilter('UD')">Underdog</button>
           <button class="ftab"    id="fUDM" onclick="setFilter('UDM')">UD Multipliers</button>
@@ -1206,7 +1205,7 @@ body {
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
 let allEdges    = [];
-let filter      = 'all';
+let filter      = 'PP';
 let edgeMode    = 'recommended'; // 'recommended' | 'all'
 let selected    = [];
 let selectedMode = null; // 'power'/'flex' for PP, 'standard'/'flex' for UD
@@ -1324,7 +1323,6 @@ function setEdgeMode(mode) {
 
 function setFilter(f) {
   filter = f;
-  document.getElementById('fAll').className = 'ftab' + (f === 'all' ? ' ud-on'  : '');
   document.getElementById('fPP').className  = 'ftab' + (f === 'PP'  ? ' pp-on'  : '');
   document.getElementById('fUD').className  = 'ftab' + (f === 'UD'  ? ' ud-on'  : '');
   document.getElementById('fUDM').className = 'ftab' + (f === 'UDM' ? ' ud-on'  : '');
@@ -1958,7 +1956,7 @@ setInterval(() => {
   updateTs();
 }, 30000);
 
-setFilter('all');
+setFilter('PP');
 refresh();
 setInterval(refresh, 600000);
 
