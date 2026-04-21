@@ -468,6 +468,25 @@ def weighted_consensus(stat_data, platform_line, sigma, use_poisson=False):
 
 # ── Player → team map ─────────────────────────────────────────────────────────
 
+def _extract_athletes(roster_json):
+    """
+    ESPN roster responses vary by sport:
+    - NBA: athletes is a list of position groups, each with an 'items' list
+    - MLB: athletes is a flat list of athlete dicts
+    Returns a flat list of athlete dicts with 'displayName'.
+    """
+    raw = roster_json.get("athletes", [])
+    athletes = []
+    for entry in raw:
+        if isinstance(entry, dict) and "items" in entry:
+            # Position group (NBA style)
+            athletes.extend(entry["items"])
+        elif isinstance(entry, dict) and "displayName" in entry:
+            # Flat entry (MLB style)
+            athletes.append(entry)
+    return athletes
+
+
 def build_player_team_map():
     import requests
     player_team = {}
@@ -482,7 +501,9 @@ def build_player_team_map():
                 f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{team_id}/roster",
                 timeout=10
             )
-            for athlete in rr.json().get("athletes", []):
+            if rr.status_code != 200:
+                continue
+            for athlete in _extract_athletes(rr.json()):
                 name = athlete.get("displayName", "")
                 if name:
                     player_team[name.lower()] = abbr
@@ -507,7 +528,9 @@ def build_mlb_player_team_map():
                 f"https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams/{team_id}/roster",
                 timeout=10
             )
-            for athlete in rr.json().get("athletes", []):
+            if rr.status_code != 200:
+                continue
+            for athlete in _extract_athletes(rr.json()):
                 name = athlete.get("displayName", "")
                 if name:
                     player_team[name.lower()] = abbr
