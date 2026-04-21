@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, render_template, request, redirect, url_for, make_response
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from bet_tracker import load_bets
+from bet_tracker import load_bets, _get_matchup_from_espn
 from slip_tracker import load_slips, load_your_slips
 from datetime import datetime, timedelta
 import json
@@ -184,25 +184,47 @@ def _enrich_slip(s, bet_lookup):
             print(f"  [ENRICH] ⚠ No bet match for {player} {stat_key} {direction} {line}")
         leg_results.append(result)
 
-    # Build per-leg opponent team from individual bet data
+    # Build per-leg opponent team, matchup, and game_date from individual bet data
     bets_full = load_bets()
     bet_full_map = {b["id"]: b for b in bets_full}
     bet_ids = s.get("bet_ids", [])
     player_teams = s.get("teams", [])
     opponent_teams = []
+    game_dates = []
+    matchups = []
+    start_times = []
     for i in range(len(s["players"])):
         opp = None
+        gd = None
+        mup = None
+        st = None
+        pt = (player_teams[i] if i < len(player_teams) else None) or ''
         if i < len(bet_ids) and bet_ids[i] is not None:
             b = bet_full_map.get(bet_ids[i])
             if b:
-                pt = (player_teams[i] if i < len(player_teams) else None) or ''
                 home = b.get("home_abbr", "")
                 away = b.get("away_abbr", "")
                 if pt and home and away:
                     opp = away if pt == home else home
+                gd = b.get("game_date")
+                mup = b.get("matchup")
+                st = b.get("start_time")
+        # bet_id is None — look up matchup from ESPN using the slip's team
+        if mup is None and pt:
+            espn = _get_matchup_from_espn(pt)
+            if espn.get("home_abbr"):
+                home = espn["home_abbr"]
+                away = espn["away_abbr"]
+                mup = espn["matchup"]
+                gd = gd or espn.get("game_date")
+                opp = away if pt == home else home
         opponent_teams.append(opp)
+        game_dates.append(gd)
+        matchups.append(mup)
+        start_times.append(st)
 
-    return {**s, "leg_results": leg_results, "opponent_teams": opponent_teams}
+    return {**s, "leg_results": leg_results, "opponent_teams": opponent_teams,
+            "game_dates": game_dates, "matchups": matchups, "start_times": start_times}
 
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
