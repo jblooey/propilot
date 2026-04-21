@@ -2,7 +2,10 @@ import json
 import os
 import requests
 import unicodedata
-from datetime import datetime, date, timedelta, timezone
+from datetime import datetime, date, timedelta
+from zoneinfo import ZoneInfo
+
+_PT = ZoneInfo("America/Los_Angeles")
 
 BETS_FILE    = "bets.json"
 RESULTS_FILE = "results.json"
@@ -623,7 +626,7 @@ def add_bet(edge: dict) -> dict | None:
         "line":         edge["platform_line"],
         "added_prob":   edge["prob"],
         "current_prob": edge["prob"],
-        "added_at":     datetime.now(timezone.utc).strftime("%Y-%m-%d %I:%M %p UTC"),
+        "added_at":     datetime.now(_PT).strftime("%Y-%m-%d %I:%M %p PT"),
         "game_date":    game_date,
         "home_abbr":    home_abbr,
         "away_abbr":    away_abbr,
@@ -927,7 +930,7 @@ def _settle_bets_for_sport(bets, sport, scoreboard_fn, summary_fn, dates_needed)
                                 if ev["id"] == gid and diff <= 1:
                                     bet["result"]     = "void"
                                     bet["reason"]     = "Inactive scratch (not in box score)"
-                                    bet["settled_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %I:%M %p UTC")
+                                    bet["settled_at"] = datetime.now(_PT).strftime("%Y-%m-%d %I:%M %p PT")
                                     print(f"  [VOID] {bet['player']} — inactive scratch "
                                           f"({'/'.join(sorted(team_tokens))} played)")
                                     settled += 1
@@ -940,7 +943,7 @@ def _settle_bets_for_sport(bets, sport, scoreboard_fn, summary_fn, dates_needed)
 
         bet["result"]     = result
         bet["reason"]     = reason
-        bet["settled_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %I:%M %p UTC")
+        bet["settled_at"] = datetime.now(_PT).strftime("%Y-%m-%d %I:%M %p PT")
         icon = "✅" if result == "hit" else "❌" if result == "miss" else "∅"
         print(f"  [{result.upper()}] {icon} {bet['player']} {bet['direction']} "
               f"{bet['line']} {bet['stat']} | {reason} | {bet.get('matchup','?')}")
@@ -997,7 +1000,7 @@ def settle_bet(bet_id: int, result: str) -> bool:
     for bet in bets:
         if bet["id"] == bet_id and bet["result"] is None:
             bet["result"]     = result
-            bet["settled_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %I:%M %p UTC")
+            bet["settled_at"] = datetime.now(_PT).strftime("%Y-%m-%d %I:%M %p PT")
             save_bets(bets)
             print(f"  ✓ Bet #{bet_id} settled as {result.upper()}")
             return True
