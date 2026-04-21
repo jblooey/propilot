@@ -189,6 +189,20 @@ body {
   margin: 0 -24px; width: calc(100% + 48px);
 }
 #perfChart { width: 100%; height: 100%; display: block; }
+.chart-stats-overlay {
+  display: flex; gap: 28px; align-items: flex-start;
+}
+.cso-item { display: flex; flex-direction: column; gap: 2px; text-align: right; }
+.cso-label {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-4); font-family: 'JetBrains Mono', monospace;
+}
+.cso-val {
+  font-size: 22px; font-weight: 700; color: var(--text-1);
+  font-family: 'JetBrains Mono', monospace; letter-spacing: -0.03em; line-height: 1;
+}
+.cso-val.pos { color: var(--green); }
+.cso-val.neg { color: var(--red); }
 .chart-disclaimer {
   font-size: 10px; color: var(--text-4);
   padding: 8px 0 14px;
@@ -248,30 +262,31 @@ body {
 
 /* ── Slips section ── */
 .slips-section {
-  padding: 12px 20px 20px;
-  display: flex; flex-direction: column; gap: 10px;
+  padding: 16px 24px 24px;
+  display: flex; flex-direction: column; gap: 12px;
 }
 
 /* ── Slips toolbar ── */
 .slips-toolbar {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; flex-wrap: wrap;
+  gap: 12px; flex-wrap: wrap;
+  padding: 4px 0;
 }
-.toolbar-left { display: flex; align-items: center; gap: 8px; }
+.toolbar-left { display: flex; align-items: center; gap: 10px; }
 .panel-title {
-  font-size: 12px; font-weight: 600; color: var(--text-3);
-  text-transform: uppercase; letter-spacing: 0.07em;
+  font-size: 14px; font-weight: 700; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 0.06em;
 }
 .toolbar-right { display: flex; align-items: center; gap: 10px; }
 .panel-count { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-4); }
 .panel-tabs { display: flex; align-items: center; gap: 0; }
 .ptab {
-  font-size: 12px; font-weight: 500;
-  padding: 5px 12px; border-radius: var(--r);
+  font-size: 13px; font-weight: 500;
+  padding: 8px 18px; border-radius: var(--r);
   border: 1px solid transparent; background: transparent;
   color: var(--text-3); cursor: pointer;
   transition: color var(--t), background var(--t), border-color var(--t);
-  display: inline-flex; align-items: center; gap: 4px;
+  display: inline-flex; align-items: center; gap: 5px;
 }
 .ptab:hover { color: var(--text-2); }
 .ptab.tab-active      { color: var(--text-1); background: var(--surface); border-color: var(--border); }
@@ -413,8 +428,9 @@ body {
   font-family: 'JetBrains Mono', monospace;
   display: inline-block; width: fit-content;
 }
-.dg-matchup { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dg-matchup { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .dg-matchup strong { color: var(--text-2); font-weight: 700; }
+.dg-date-tag { font-size: 10px; color: var(--text-4); font-family: 'JetBrains Mono', monospace; }
 
 /* Player cell */
 .dg-pcol { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -752,30 +768,28 @@ body {
 
 <!-- ── Performance section ── -->
 <div class="perf-section">
-  <div class="perf-header-top">
-    <div>
-      <div class="perf-title">Slip Performance</div>
-      <div class="unit-controls">
-        <span class="unit-label">Unit</span>
-        <button class="unit-btn" onclick="adjustUnit(-1)">−</button>
-        <input class="unit-input" id="unitInput" type="number" min="1" max="1000" value="5" onchange="unitChanged()">
-        <button class="unit-btn" onclick="adjustUnit(1)">+</button>
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
+    <div class="perf-title">Slip Performance</div>
+    <div class="chart-stats-overlay">
+      <div class="cso-item">
+        <div class="cso-label">Total Units</div>
+        <div class="cso-val" id="unitCount">—</div>
+      </div>
+      <div class="cso-item">
+        <div class="cso-label">ROI / Wager</div>
+        <div class="cso-val" id="roiPerWager">—</div>
+      </div>
+      <div class="cso-item">
+        <div class="cso-label">Total P&amp;L</div>
+        <div class="cso-val" id="unitPnl">—</div>
       </div>
     </div>
-    <div class="perf-stats-group">
-      <div class="ps-item">
-        <div class="ps-label">Total Units</div>
-        <div class="ps-val" id="unitCount">—</div>
-      </div>
-      <div class="ps-item">
-        <div class="ps-label">ROI Per Wager</div>
-        <div class="ps-val" id="roiPerWager">—</div>
-      </div>
-      <div class="ps-item">
-        <div class="ps-label">Total P&amp;L</div>
-        <div class="ps-val" id="unitPnl">—</div>
-      </div>
-    </div>
+  </div>
+  <div class="unit-controls" style="margin-bottom:16px;">
+    <span class="unit-label">Unit</span>
+    <button class="unit-btn" onclick="adjustUnit(-1)">−</button>
+    <input class="unit-input" id="unitInput" type="number" min="1" max="1000" value="5" onchange="unitChanged()">
+    <button class="unit-btn" onclick="adjustUnit(1)">+</button>
   </div>
   <div class="chart-wrap">
     <svg id="perfChart"></svg>
@@ -999,7 +1013,6 @@ function renderAnalytics(results) {
 
   // Keys must match formatType() output exactly — no hyphens in "Pick"
   const BE_MAP = {
-    'PP 2 Pick Power': 33.3,
     'PP 3 Pick Power': 16.7,
     'UD 2 Pick Power': 28.6,
     'UD 3 Pick Power': 15.4,
@@ -1011,6 +1024,9 @@ function renderAnalytics(results) {
 
   for (const s of settled) {
     const typeKey = `${s.platform} ${formatType(s.type)}`;
+    // Skip PP 2-picks — autopilot no longer generates them
+    if (typeKey === 'PP 2 Pick Power') continue;
+
     if (!typeMap[typeKey]) typeMap[typeKey] = { h:0, m:0, platform: s.platform };
 
     // A "win" is only when profit > 0 — catches flex partial losses (e.g. 4/6 = 0.4x payout)
@@ -1019,10 +1035,16 @@ function renderAnalytics(results) {
     if (isWin) typeMap[typeKey].h++;
     else typeMap[typeKey].m++;
 
-    const isMlb = (s.details || []).some(d => detectSport(d) === 'MLB');
-    const sport = isMlb ? 'MLB' : 'NBA';
-    if (isWin) sportMap[sport].h++;
-    else sportMap[sport].m++;
+    // Sport breakdown: count individual leg hits/misses by sport
+    const legResults = s.leg_results || [];
+    for (let i = 0; i < legResults.length; i++) {
+      const lr = legResults[i];
+      if (!lr || lr === 'void') continue;
+      const detail = (s.details || [])[i] || '';
+      const sport = detectSport(detail) === 'MLB' ? 'MLB' : 'NBA';
+      if (lr === 'hit') sportMap[sport].h++;
+      else if (lr === 'miss') sportMap[sport].m++;
+    }
   }
 
   // Type breakdown
@@ -1128,14 +1150,14 @@ function updateUnitDisplay() {
   const roiEl   = document.getElementById('roiPerWager');
 
   pnlEl.textContent = scaledPnl >= 0 ? `+$${scaledPnl.toFixed(2)}` : `-$${Math.abs(scaledPnl).toFixed(2)}`;
-  pnlEl.className   = `ps-val ${scaledPnl > 0 ? 'pos' : scaledPnl < 0 ? 'neg' : ''}`;
+  pnlEl.className   = `cso-val ${scaledPnl > 0 ? 'pos' : scaledPnl < 0 ? 'neg' : ''}`;
 
   const unitStr = units >= 0 ? `+${units.toFixed(1)}u` : `${units.toFixed(1)}u`;
   unitEl.textContent = unitStr;
-  unitEl.className   = `ps-val ${units > 0 ? 'pos' : units < 0 ? 'neg' : ''}`;
+  unitEl.className   = `cso-val ${units > 0 ? 'pos' : units < 0 ? 'neg' : ''}`;
 
   roiEl.textContent = `${roi >= 0 ? '+' : ''}${roi.toFixed(2)}%`;
-  roiEl.className   = `ps-val ${roi > 0 ? 'pos' : roi < 0 ? 'neg' : ''}`;
+  roiEl.className   = `cso-val ${roi > 0 ? 'pos' : roi < 0 ? 'neg' : ''}`;
 
   // Compat
   const sbPnlEl = document.getElementById('sbPnl');
@@ -1374,6 +1396,23 @@ function teamAvatar(abbr, lrClass, platformClass) {
   return `<div class="psc-avatar${resultCls}" style="background:${c.bg};color:${c.fg};">${abbr || '?'}</div>`;
 }
 
+function fmtUtcTs(ts) {
+  if (!ts) return '—';
+  // Timestamps stored as "YYYY-MM-DD HH:MM AM/PM UTC" — convert to local time
+  const isUtc = ts.endsWith(' UTC');
+  if (isUtc) {
+    const base = ts.slice(0, -4); // strip " UTC"
+    const d = new Date(base.replace(' ', 'T') + ':00Z');
+    if (!isNaN(d)) {
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const h = d.getHours(), m = d.getMinutes().toString().padStart(2,'0');
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} ${h % 12 || 12}:${m} ${ampm}`;
+    }
+  }
+  return ts; // legacy timestamps: display as-is
+}
+
 function formatType(type) {
   // "3-pick" → "3-Pick Power"  "3-pick-flex" → "3-Pick Flex"
   if (!type) return '';
@@ -1446,13 +1485,37 @@ function renderSlipCard(s) {
     else if (lr === 'void') { if (isOver) moreCls += ' on void'; else lessCls += ' on void'; }
     else                    { if (isOver) moreCls += ' on'; else lessCls += ' on'; }
 
-    const sport   = detectSport(detail);
-    const matchup = team ? `<span class="dg-matchup"><strong>${team}</strong>${opp ? ` vs ${opp}` : ''}</span>` : '';
+    const sport       = detectSport(detail);
+    const gameDateRaw = (s.game_dates  || [])[i] || '';
+    const startTimeRaw= (s.start_times || [])[i] || '';
+    const fullMatchup = (s.matchups    || [])[i] || '';
+    const matchupStr  = fullMatchup || (team ? `${team}${opp ? ` vs ${opp}` : ''}` : '');
+    const dateLabel   = (() => {
+      if (startTimeRaw) {
+        // start_time is ISO UTC — convert to local browser time
+        const d = new Date(startTimeRaw);
+        if (!isNaN(d)) {
+          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          const h = d.getHours(), m = d.getMinutes().toString().padStart(2,'0');
+          const ampm = h >= 12 ? 'PM' : 'AM';
+          return `${months[d.getMonth()]} ${d.getDate()} · ${h % 12 || 12}:${m} ${ampm}`;
+        }
+      }
+      if (gameDateRaw) {
+        const [,mo,dy] = gameDateRaw.split('-');
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return `${months[parseInt(mo,10)-1]} ${parseInt(dy,10)}`;
+      }
+      return '';
+    })();
+    const matchupHtml = matchupStr
+      ? `<span class="dg-matchup"><strong>${matchupStr}</strong>${dateLabel ? `<span class="dg-date-tag">${dateLabel}</span>` : ''}</span>`
+      : '';
 
     return `<div class="dg-row ${lrCls}">
       <div class="dg-match">
         <span class="dg-league">${sport}</span>
-        ${matchup}
+        ${matchupHtml}
       </div>
       <div class="dg-pcol">
         <div class="dg-pname ${lrCls}">${player}${sym}</div>
@@ -1521,7 +1584,7 @@ function renderSlipCard(s) {
       </div>
     </div>
     <div class="psc-detail">
-      <div class="psc-detail-row"><span class="sd-label">Created</span><span class="sd-val">${s.created_at || '—'}</span></div>
+      <div class="psc-detail-row"><span class="sd-label">Created</span><span class="sd-val">${fmtUtcTs(s.created_at)}</span></div>
       <div class="psc-detail-row"><span class="sd-label">Joint Prob</span><span class="sd-val">${s.joint_prob}%</span></div>
       <div class="psc-detail-row"><span class="sd-label">Stake</span><span class="sd-val">$${stake.toFixed(2)}</span></div>
       <div class="psc-detail-row"><span class="sd-label">EV</span><span class="sd-val">${evStr} · ${evDollar}</span></div>

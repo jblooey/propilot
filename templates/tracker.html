@@ -43,8 +43,8 @@
 ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
 
 @keyframes pageIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes blink   { 0%,100%{opacity:1} 50%{opacity:0.3} }
-@keyframes spin    { to { transform: rotate(360deg); } }
+@keyframes blink  { 0%,100%{opacity:1} 50%{opacity:0.3} }
+@keyframes spin   { to { transform: rotate(360deg); } }
 
 body {
   background: var(--bg);
@@ -101,245 +101,156 @@ body {
 .topbar-link { font-size: 11px; color: var(--text-4); text-decoration: none; transition: color var(--t); }
 .topbar-link:hover { color: var(--text-2); }
 
-/* ── Stats strip ── */
-.stats-strip {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-  padding: 10px 16px 0;
-  flex-shrink: 0;
-}
-.ysc {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-top: 2px solid rgba(34,211,238,0.20);
-  border-radius: var(--r);
-  padding: 10px 12px;
-  position: relative; overflow: hidden;
-}
-.ysc::before {
-  content: ''; position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 50% 0%, rgba(34,211,238,0.04) 0%, transparent 65%);
-  pointer-events: none;
-}
-.ysc-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-4); margin-bottom: 5px; }
-.ysc-value { font-size: 22px; font-weight: 700; color: var(--text-1); letter-spacing: -0.03em; line-height: 1; }
-.ysc-value.g { color: var(--green); }
-.ysc-value.r { color: var(--red); }
-.ysc-value.a { color: var(--amber); }
-.ysc-sub { font-size: 10px; color: var(--text-4); margin-top: 4px; }
-.plat-pill { font-size: 9px; font-weight: 700; font-family: 'JetBrains Mono', monospace; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.06em; }
-.pp-pill { color: #a78bfa; background: rgba(124,58,237,0.12); border: 1px solid rgba(124,58,237,0.35); }
-.ud-pill { color: #fbbf24; background: rgba(217,119,6,0.12);  border: 1px solid rgba(217,119,6,0.35); }
-.ysc.pp-card { border-top-color: rgba(124,58,237,0.45); }
-.ysc.ud-card { border-top-color: rgba(217,119,6,0.45); }
-
 /* ── Layout ── */
 .layout {
   display: flex;
-  height: calc(100vh - 72px - 82px);
-  padding: 10px 16px 12px;
+  height: calc(100vh - 72px);
+  padding: 12px 16px 12px;
   gap: 12px;
 }
 
-/* ── Tracker panel (left) ── */
+/* ── Tracker panel (left, scrollable) ── */
 .tracker-panel {
   flex: 1; min-width: 0;
   display: flex; flex-direction: column;
   background: var(--surface);
   border-radius: var(--r);
   border: 1px solid var(--border);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-/* ── View toggle ── */
-.view-toggle-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 14px;
-  height: 44px;
+/* ── Performance Section (matches Autopilot) ── */
+.perf-section-t {
+  padding: 20px 24px 0;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.vt-tabs { display: flex; gap: 0; }
-.vt-btn {
-  font-size: 12px; font-weight: 500;
-  padding: 0 16px; height: 44px;
-  border: none; background: none;
-  color: var(--text-3); cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: color var(--t), border-color var(--t);
+.perf-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 16px;
 }
-.vt-btn.active { color: var(--text-1); border-bottom-color: var(--accent); }
-.vt-btn:hover:not(.active) { color: var(--text-2); }
-.vt-summary { display: flex; align-items: center; gap: 16px; }
-.vt-stat { display: flex; align-items: baseline; gap: 4px; }
-.vt-stat-val { font-size: 14px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
-.vt-stat-val.pos { color: var(--green); }
-.vt-stat-val.neg { color: var(--red); }
-.vt-stat-lbl { font-size: 10px; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.05em; }
+.perf-title-t {
+  font-size: 20px; font-weight: 700; color: var(--text-1);
+  letter-spacing: -0.02em;
+}
+.perf-cso { display: flex; gap: 28px; align-items: flex-start; }
+.perf-cso-item { display: flex; flex-direction: column; gap: 2px; text-align: right; }
+.perf-cso-label {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-4); font-family: 'JetBrains Mono', monospace;
+}
+.perf-cso-val {
+  font-size: 22px; font-weight: 700; color: var(--text-1);
+  font-family: 'JetBrains Mono', monospace; letter-spacing: -0.03em; line-height: 1;
+}
+.perf-cso-val.pos { color: var(--green); }
+.perf-cso-val.neg { color: var(--red); }
+.chart-wrap-t {
+  height: 200px; position: relative;
+  margin: 0 -24px; width: calc(100% + 48px);
+}
+#trackerChart { width: 100%; height: 100%; display: block; }
+.chart-disclaimer { font-size: 10px; color: var(--text-4); padding: 8px 0 14px; font-style: italic; }
 
 /* ── Calendar ── */
 .cal-container {
-  padding: 14px;
-  overflow-y: auto;
-  flex: 1;
+  padding: 18px 20px 24px;
 }
 .cal-header {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
-.cal-month-label { font-size: 15px; font-weight: 700; color: var(--text-1); letter-spacing: -0.01em; }
-.cal-nav-group { display: flex; gap: 4px; }
+.cal-header-left { display: flex; align-items: center; gap: 10px; }
+.cal-month-label { font-size: 15px; font-weight: 700; color: var(--text-1); letter-spacing: -0.02em; }
+.cal-nav-group { display: flex; gap: 3px; }
 .cal-nav-btn {
-  background: var(--surface-2); border: 1px solid var(--border-2);
+  background: transparent; border: 1px solid var(--border-2);
   border-radius: var(--r-sm); color: var(--text-3);
-  width: 28px; height: 28px; cursor: pointer;
+  width: 26px; height: 26px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  font-size: 13px; transition: all var(--t); line-height: 1;
+  font-size: 14px; transition: all var(--t); line-height: 1;
 }
-.cal-nav-btn:hover { color: var(--text-1); border-color: var(--accent); }
+.cal-nav-btn:hover { color: var(--text-1); background: #1d1d21; }
+.cal-month-profit {
+  font-size: 12px; color: var(--text-4);
+  font-family: 'JetBrains Mono', monospace;
+}
+.cal-month-profit span { font-weight: 700; }
+.cal-month-profit span.pos { color: var(--green); }
+.cal-month-profit span.neg { color: var(--red); }
 .cal-weekdays {
   display: grid; grid-template-columns: repeat(7, 1fr);
-  gap: 3px;
-  margin-bottom: 3px;
+  gap: 5px; margin-bottom: 5px;
 }
 .cal-weekday {
-  font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.07em;
   text-transform: uppercase; color: var(--text-4);
   text-align: center; padding: 4px 0;
 }
 .cal-grid {
   display: grid; grid-template-columns: repeat(7, 1fr);
-  gap: 3px;
+  gap: 5px;
 }
 .cal-day {
-  min-height: 72px;
-  border-radius: var(--r-sm);
+  min-height: 76px;
+  border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--surface-2);
+  background: #18181b;
   padding: 7px 9px;
   cursor: pointer;
-  transition: all 150ms;
-  display: flex; flex-direction: column; gap: 2px;
-  position: relative;
+  transition: transform 120ms ease, filter 120ms ease;
+  display: flex; flex-direction: column;
+  justify-content: space-between;
 }
-.cal-day:hover { border-color: var(--border-2); background: #1d1d21; }
-.cal-empty { border: none !important; background: none !important; cursor: default; min-height: 72px; pointer-events: none; }
-.cal-today { border-color: rgba(34,211,238,0.35) !important; }
+.cal-day:hover { transform: translateY(-2px); filter: brightness(1.12); }
+.cal-empty { border: none !important; background: none !important; cursor: default; min-height: 76px; pointer-events: none; }
+.cal-today { border: 2px solid rgba(34,211,238,0.55) !important; }
 .cal-today .cal-day-num { color: var(--accent); font-weight: 700; }
-.cal-selected { border-color: var(--accent) !important; background: var(--accent-dim) !important; }
-.cal-win  { background: rgba(34,197,94,0.07);  border-color: rgba(34,197,94,0.22) !important; }
-.cal-loss { background: rgba(239,68,68,0.07);  border-color: rgba(239,68,68,0.22) !important; }
-.cal-push { background: var(--surface-2); }
-.cal-active-day { background: rgba(245,158,11,0.07); border-color: rgba(245,158,11,0.24) !important; }
+.cal-selected { outline: 2px solid rgba(34,211,238,0.7); outline-offset: 2px; }
+.cal-win  { background: #1a3d2b; border-color: #245c3e !important; }
+.cal-loss { background: #3d1a1a; border-color: #5c2828 !important; }
+.cal-push { background: #18181b; }
+.cal-active-day { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.30) !important; }
+.cal-win:hover, .cal-loss:hover { border-color: inherit !important; }
+.cal-day-num { font-size: 11px; font-weight: 500; color: var(--text-4); line-height: 1; }
+.cal-win  .cal-day-num, .cal-loss .cal-day-num { color: rgba(255,255,255,0.45); }
+.cal-day-pnl { font-size: 22px; font-weight: 800; line-height: 1; letter-spacing: -0.03em; color: rgba(255,255,255,0.92); }
+.cal-day-pnl.active-label { font-size: 12px; font-weight: 600; color: var(--amber); letter-spacing: 0; }
 
-.cal-day-num {
-  font-size: 11px; font-weight: 600; color: var(--text-3);
-  line-height: 1;
-}
-.cal-day-pnl {
-  font-size: 12px; font-weight: 700;
-  font-family: 'JetBrains Mono', monospace;
-  margin-top: 4px;
-}
-.cal-day-pnl.pos { color: var(--green); }
-.cal-day-pnl.neg { color: var(--red); }
-.cal-day-record {
-  font-size: 10px; color: var(--text-4);
-  font-family: 'JetBrains Mono', monospace;
-  line-height: 1;
-}
-.cal-day-dot {
-  position: absolute; bottom: 5px; right: 7px;
-  width: 5px; height: 5px; border-radius: 50%;
-}
-.cal-day-dot.win  { background: var(--green); }
-.cal-day-dot.loss { background: var(--red); }
-.cal-day-dot.active { background: var(--amber); }
-
-/* ── Day detail panel ── */
-.cal-detail {
-  margin-top: 12px;
-  border: 1px solid var(--border-2);
-  border-radius: var(--r);
-  background: var(--surface-2);
-  overflow: hidden;
-  animation: slideDown 180ms ease both;
-}
-@keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
-.cal-detail-header {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-}
-.cal-detail-date { font-size: 12px; font-weight: 600; color: var(--text-1); }
-.cal-detail-summary { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--text-3); }
-.cal-detail-close {
-  background: none; border: none; cursor: pointer;
-  color: var(--text-4); font-size: 14px; line-height: 1;
-  padding: 2px 4px; transition: color var(--t);
-}
+/* ── Day detail ── */
+.cal-detail { margin-top: 10px; border: 1px solid var(--border-2); border-radius: var(--r); background: var(--surface-2); overflow: hidden; animation: slideDown 180ms ease both; }
+@keyframes slideDown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+.cal-detail-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cal-detail-date { font-size: 14px; font-weight: 700; color: var(--text-1); letter-spacing: -0.01em; }
+.cal-detail-summary { font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--text-3); }
+.cal-detail-close { background: none; border: none; cursor: pointer; color: var(--text-4); font-size: 16px; line-height: 1; padding: 2px 4px; transition: color var(--t); flex-shrink: 0; }
 .cal-detail-close:hover { color: var(--text-2); }
-.cal-detail-body { padding: 8px 14px 12px; display: flex; flex-direction: column; gap: 6px; }
-.cal-slip {
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  background: var(--bg);
-  display: flex; flex-direction: column; gap: 5px;
-}
-.cal-slip.pp { border-color: var(--pp-border); }
-.cal-slip.ud { border-color: var(--ud-border); }
-.cal-slip-head {
-  display: flex; align-items: center; justify-content: space-between;
-}
-.cal-slip-left { display: flex; align-items: center; gap: 6px; }
-.ptag-sm {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px; font-weight: 600; text-transform: uppercase;
-  padding: 1px 4px; border-radius: var(--r-sm);
-  border: 1px solid var(--border-2); color: var(--text-3);
-}
-.ptag-sm.pp { color: #a78bfa; border-color: var(--pp-border); }
-.ptag-sm.ud { color: #fbbf24; border-color: var(--ud-border); }
-.cal-slip-type { font-size: 10px; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.04em; }
-.cal-slip-result-badge {
-  font-size: 11px; font-weight: 700;
-  font-family: 'JetBrains Mono', monospace;
-}
-.cal-slip-pnl { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: var(--text-4); }
-.cal-slip-legs { display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--border); padding-top: 5px; }
-.cal-slip-leg {
-  display: flex; align-items: center; justify-content: space-between;
-  font-size: 11px;
-}
-.cal-slip-leg-name { color: var(--text-2); }
-.cal-slip-leg-name.hit  { color: var(--green); font-weight: 600; }
-.cal-slip-leg-name.miss { color: var(--red); opacity: 0.7; text-decoration: line-through; }
-.cal-slip-leg-detail { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: var(--text-4); }
-.cal-detail-empty { padding: 20px; text-align: center; color: var(--text-4); font-size: 12px; }
+.cal-detail-body { padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
 
-/* ── Chart view ── */
-.chart-container {
-  flex: 1; display: flex; flex-direction: column;
-  padding: 16px 20px 14px;
-  overflow: hidden;
-}
-.chart-stats-row {
-  display: flex; gap: 24px; margin-bottom: 14px; flex-shrink: 0;
-}
-.chart-stat { display: flex; flex-direction: column; gap: 3px; }
-.chart-stat-val { font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing: -0.03em; }
-.chart-stat-val.pos { color: var(--green); }
-.chart-stat-val.neg { color: var(--red); }
-.chart-stat-lbl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-4); }
-.chart-wrap { flex: 1; position: relative; min-height: 0; }
-#trackerChart { width: 100%; height: 100%; display: block; }
-.chart-disclaimer { font-size: 10px; color: var(--text-4); margin-top: 8px; flex-shrink: 0; }
+/* Popup slip cards — larger & more readable */
+.cal-slip { padding: 16px 18px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); display: flex; flex-direction: column; gap: 12px; }
+.cal-slip.pp { border-color: var(--pp-border); box-shadow: 0 2px 12px var(--pp-glow); }
+.cal-slip.ud { border-color: var(--ud-border); box-shadow: 0 2px 12px var(--ud-glow); }
+.cal-slip-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.cal-slip-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ptag-sm { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 3px 7px; border-radius: var(--r-sm); border: 1px solid var(--border-2); color: var(--text-3); }
+.ptag-sm.pp { color: #a78bfa; border-color: var(--pp-border); background: rgba(124,58,237,0.08); }
+.ptag-sm.ud { color: #fbbf24; border-color: var(--ud-border); background: rgba(217,119,6,0.08); }
+.cal-slip-type { font-size: 11px; font-weight: 600; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.05em; }
+.cal-slip-result-badge { font-size: 13px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.cal-slip-pnl { font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--text-4); white-space: nowrap; }
+.cal-slip-legs { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px; }
+.cal-slip-leg { display: flex; align-items: center; justify-content: space-between; font-size: 13px; gap: 10px; }
+.cal-slip-leg-name { color: var(--text-2); font-weight: 500; flex: 1; min-width: 0; }
+.cal-slip-leg-name.hit  { color: var(--green); font-weight: 600; }
+.cal-slip-leg-name.miss { color: var(--red); opacity: 0.8; text-decoration: line-through; }
+.cal-slip-leg-detail { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--text-4); white-space: nowrap; }
+.cal-detail-empty { padding: 28px; text-align: center; color: var(--text-4); font-size: 12px; }
 
 /* ── Side panel ── */
 .side-panel {
-  width: 300px; flex-shrink: 0;
+  width: 460px; flex-shrink: 0;
   display: flex; flex-direction: column;
   overflow: hidden;
 }
@@ -353,17 +264,18 @@ body {
   overflow: hidden; flex: 1; min-height: 0;
 }
 .slips-header {
-  padding: 0 12px;
+  padding: 0 14px;
   height: 44px;
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;
   flex-shrink: 0;
 }
 .slips-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-4); }
+.slips-meta { display: flex; align-items: center; gap: 8px; }
 .slips-tabs { display: flex; align-items: center; height: 100%; }
 .stab {
   font-size: 11px; font-weight: 500;
-  padding: 0; margin-left: 12px;
+  padding: 0; margin-left: 14px;
   height: 100%; border: none; background: none;
   color: var(--text-3); cursor: pointer;
   border-bottom: 2px solid transparent;
@@ -371,64 +283,140 @@ body {
 }
 .stab:first-child { margin-left: 0; }
 .stab.on { color: var(--text-1); border-bottom-color: var(--accent); }
-.slips-meta {
-  display: flex; align-items: center; gap: 8px;
-}
-.slips-body { overflow-y: auto; flex: 1; padding: 6px 10px; }
+.slips-body { overflow-y: auto; flex: 1; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
 
-/* Slip items */
-.slip-item {
-  padding: 8px 10px;
+/* ── dg-card (Autopilot-style slip cards) ── */
+.dg-card {
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--r);
-  margin-bottom: 5px;
-  transition: background var(--t), border-color var(--t);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color var(--t);
+  display: flex; flex-direction: column;
+  flex-shrink: 0;
+}
+.dg-card.pp { border-color: var(--pp-border); box-shadow: 0 0 0 1px rgba(124,58,237,0.10), 0 4px 20px var(--pp-glow); }
+.dg-card.ud { border-color: var(--ud-border); box-shadow: 0 0 0 1px rgba(217,119,6,0.10), 0 4px 20px var(--ud-glow); }
+.dg-card.hit  { border-left: 3px solid var(--green); }
+.dg-card.miss { border-left: 3px solid var(--red); }
+
+.dg-body { display: flex; align-items: stretch; }
+
+/* Left platform panel */
+.dg-plat {
+  width: 90px; flex-shrink: 0;
+  padding: 16px 10px;
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px;
+  background: rgba(0,0,0,0.20);
+}
+.dg-plat img { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; display: block; }
+.dg-stake { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700; color: var(--text-1); letter-spacing: -0.02em; }
+.dg-type-lbl { font-size: 10px; color: var(--text-4); text-align: center; }
+
+/* Table area */
+.dg-tbl { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dg-hrow {
+  display: grid;
+  grid-template-columns: 1fr 62px 40px 66px;
+  padding: 6px 12px;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,0,0,0.15);
+  align-items: center;
+}
+.dg-th { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-4); font-family: 'JetBrains Mono', monospace; }
+.dg-row {
+  display: grid;
+  grid-template-columns: 1fr 62px 40px 66px;
+  padding: 10px 12px;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.dg-row:last-of-type { border-bottom: none; }
+.dg-row.hit  { background: rgba(34,197,94,0.04); }
+.dg-row.miss { background: rgba(239,68,68,0.04); }
+
+/* Player cell */
+.dg-pcol { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.dg-pname { font-size: 13px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dg-pname.hit  { color: var(--green); }
+.dg-pname.miss { color: var(--red); opacity: 0.85; }
+.dg-pname.void { color: var(--text-4); }
+.dg-pprob { font-size: 11px; font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 4px; }
+.psc-delta { font-size: 10px; font-weight: 600; }
+.psc-delta.up { color: var(--green); }
+.psc-delta.dn { color: var(--red); }
+.psc-delta.fl { color: var(--text-4); }
+
+/* Stat, Line cells */
+.dg-stat { display: flex; align-items: center; }
+.dg-stat-name { font-size: 11px; font-weight: 600; color: var(--text-2); }
+.dg-line { display: flex; align-items: center; }
+.dg-lineval { font-size: 15px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--text-1); letter-spacing: -0.02em; }
+
+/* Pick button (single, read-only) */
+.dg-ou { display: flex; align-items: center; }
+.dg-btn {
+  flex: 1; padding: 6px 0; text-align: center;
+  font-size: 11px; font-weight: 600;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-2);
+  background: var(--surface-2);
+  color: var(--text-4);
+  cursor: default;
+  font-family: 'Inter', sans-serif;
+}
+.dg-btn.on         { background: rgba(34,197,94,0.14); border-color: var(--green-border); color: var(--green); }
+.dg-btn.on.hit     { background: var(--green-dim); border-color: var(--green-border); color: var(--green); }
+.dg-btn.on.miss    { background: var(--red-dim);   border-color: var(--red-border);   color: var(--red); }
+.dg-btn.on.void    { background: rgba(113,113,122,0.12); border-color: rgba(113,113,122,0.30); color: #71717a; }
+
+/* Right EV panel */
+.dg-ev {
+  width: 72px; flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px; padding: 12px 6px;
+  background: rgba(0,0,0,0.20);
+}
+.dg-ev-val { font-size: 17px; font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing: -0.03em; text-align: center; line-height: 1; }
+.dg-ev-val.pos { color: var(--green); }
+.dg-ev-val.neg { color: var(--red); }
+.dg-ev-val.neu { color: var(--text-3); }
+.dg-ev-lbl { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-4); font-family: 'JetBrains Mono', monospace; }
+
+/* Card footer */
+.dg-footer {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
   background: var(--surface-2);
 }
-.slip-item:hover { background: #1d1d21; }
-.slip-item:last-child { margin-bottom: 0; }
-.slip-item.pp { border-color: var(--pp-border); box-shadow: 0 0 0 1px rgba(124,58,237,0.10), 0 0 16px var(--pp-glow); }
-.slip-item.ud { border-color: var(--ud-border); box-shadow: 0 0 0 1px rgba(217,119,6,0.10), 0 0 16px var(--ud-glow); }
-.si-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
-.si-left { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-.si-type { font-size: 10px; font-weight: 500; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.04em; }
-.si-jp   { font-size: 10px; color: var(--text-4); font-family: 'JetBrains Mono', monospace; }
-.si-ev-pct    { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; }
-.si-ev-dollar { font-size: 10px; color: var(--text-4); margin-top: 2px; text-align: right; font-family: 'JetBrains Mono', monospace; }
-.ev-p { color: var(--green); }
-.ev-n { color: var(--red); }
-.si-legs { border-top: 1px solid var(--border); padding-top: 5px; display: flex; flex-direction: column; gap: 3px; }
-.si-leg  { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--border); }
-.si-leg:last-child { border-bottom: none; }
-.si-leg-left { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; }
-.leg-num-sm { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--border-2); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; color: var(--text-3); flex-shrink: 0; }
-.leg-num-sm.hit  { background: var(--green-dim); color: var(--green); border-color: var(--green-border); }
-.leg-num-sm.miss { background: var(--red-dim);   color: var(--red);   border-color: var(--red-border); }
-.leg-num-sm.void { background: rgba(113,113,122,0.15); color: #71717a; border-color: rgba(113,113,122,0.30); }
-.leg-name { font-size: 12px; font-weight: 400; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.leg-name.hit  { color: var(--green); font-weight: 600; }
-.leg-name.miss { color: var(--red); text-decoration: line-through; opacity: 0.7; }
-.leg-name.void { color: #71717a; }
-.leg-detail-txt { font-size: 10px; color: var(--text-4); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
-.leg-prob-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
-.leg-prob-val { font-size: 14px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
-.leg-delta { font-size: 9px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
-.leg-delta.up { color: var(--green); }
-.leg-delta.dn { color: var(--red); }
-.leg-delta.fl { color: var(--text-4); }
-.prob-green  { color: #4ade80; }
-.prob-red    { color: #f87171; }
-.prob-neutral{ color: var(--text-3); }
+.dg-result { font-size: 12px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.dg-result.hit    { color: var(--green); }
+.dg-result.miss   { color: var(--red); }
+.dg-result.refund { color: var(--text-4); }
+.dg-active-badge { font-size: 10px; font-weight: 600; color: var(--amber); font-family: 'JetBrains Mono', monospace; }
 .settle-btn {
   font-size: 10px; font-weight: 500; color: var(--text-4);
   background: transparent; border: 1px solid var(--border);
-  border-radius: var(--r-sm); padding: 2px 7px; cursor: pointer;
+  border-radius: var(--r-sm); padding: 3px 8px; cursor: pointer;
   transition: color var(--t), border-color var(--t);
   font-family: 'JetBrains Mono', monospace;
 }
 .settle-btn:hover { color: var(--text-2); border-color: var(--border-2); }
 
-.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; gap: 5px; text-align: center; }
+/* Prob classes */
+.prob-green  { color: #4ade80; }
+.prob-red    { color: #f87171; }
+.prob-neutral{ color: var(--text-3); }
+
+.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 16px; gap: 5px; text-align: center; }
 .e-title { font-size: 12px; font-weight: 500; color: var(--text-4); }
 .e-sub   { font-size: 11px; color: var(--text-4); }
 
@@ -444,14 +432,8 @@ body {
   border-radius: 10px; padding: 20px; width: 340px; max-width: 95vw;
 }
 .modal-title { font-size: 13px; font-weight: 600; color: var(--text-1); margin-bottom: 14px; }
-.modal-leg {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 8px; margin-bottom: 10px;
-}
-.modal-leg-name {
-  font-size: 11px; color: var(--text-2); flex: 1; min-width: 0;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
+.modal-leg { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.modal-leg-name { font-size: 11px; color: var(--text-2); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .leg-btns { display: flex; gap: 4px; flex-shrink: 0; }
 .leg-btn {
   font-size: 10px; font-weight: 600; padding: 3px 8px;
@@ -463,28 +445,12 @@ body {
 .leg-btn.hit.sel  { background: var(--green-dim);  border-color: var(--green-border);  color: var(--green); }
 .leg-btn.miss.sel { background: var(--red-dim);    border-color: var(--red-border);    color: var(--red); }
 .leg-btn.void.sel { background: rgba(113,113,122,0.12); border-color: rgba(113,113,122,0.3); color: #a1a1aa; }
-.modal-result {
-  margin: 14px 0 16px; padding: 8px 10px;
-  border-radius: var(--r); background: var(--surface-2);
-  border: 1px solid var(--border);
-  font-size: 12px; color: var(--text-3);
-  font-family: 'JetBrains Mono', monospace;
-}
+.modal-result { margin: 14px 0 16px; padding: 8px 10px; border-radius: var(--r); background: var(--surface-2); border: 1px solid var(--border); font-size: 12px; color: var(--text-3); font-family: 'JetBrains Mono', monospace; }
 .modal-result span { font-weight: 600; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
-.modal-cancel {
-  font-size: 12px; font-weight: 500; color: var(--text-3);
-  background: transparent; border: 1px solid var(--border-2);
-  border-radius: var(--r); padding: 6px 14px; cursor: pointer;
-  transition: color var(--t);
-}
+.modal-cancel { font-size: 12px; font-weight: 500; color: var(--text-3); background: transparent; border: 1px solid var(--border-2); border-radius: var(--r); padding: 6px 14px; cursor: pointer; transition: color var(--t); }
 .modal-cancel:hover { color: var(--text-1); }
-.modal-confirm {
-  font-size: 12px; font-weight: 600; color: #0f0f11;
-  background: var(--accent); border: none;
-  border-radius: var(--r); padding: 6px 14px; cursor: pointer;
-  transition: opacity var(--t);
-}
+.modal-confirm { font-size: 12px; font-weight: 600; color: #0f0f11; background: var(--accent); border: none; border-radius: var(--r); padding: 6px 14px; cursor: pointer; transition: opacity var(--t); }
 .modal-confirm:hover { opacity: 0.85; }
 
 /* Toast */
@@ -524,71 +490,47 @@ body {
   </div>
 </div>
 
-<!-- Stats strip -->
-<div class="stats-strip">
-  <div class="ysc">
-    <div class="ysc-label">Leg Hit Rate</div>
-    <div style="display:flex;align-items:baseline;gap:8px;">
-      <div class="ysc-value" id="ysIndRate">—</div>
-      <div style="font-size:11px;color:var(--text-4);font-family:'JetBrains Mono',monospace;" id="ysIndRecord">— of — legs</div>
-    </div>
-  </div>
-  <div class="ysc pp-card">
-    <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
-      <span class="plat-pill pp-pill">PrizePicks</span>
-      <span class="ysc-label" style="margin-bottom:0;">2-Pick · 3x</span>
-    </div>
-    <div class="ysc-value" id="ysPP2">—</div>
-    <div class="ysc-sub">need 33.3% BE</div>
-  </div>
-  <div class="ysc pp-card">
-    <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
-      <span class="plat-pill pp-pill">PrizePicks</span>
-      <span class="ysc-label" style="margin-bottom:0;">3-Pick · 6x</span>
-    </div>
-    <div class="ysc-value" id="ysPP3">—</div>
-    <div class="ysc-sub">need 16.7% BE</div>
-  </div>
-  <div class="ysc ud-card">
-    <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
-      <span class="plat-pill ud-pill">Underdog</span>
-      <span class="ysc-label" style="margin-bottom:0;">2-Pick · 3.5x</span>
-    </div>
-    <div class="ysc-value" id="ysUD2">—</div>
-    <div class="ysc-sub">need 28.6% BE</div>
-  </div>
-  <div class="ysc ud-card">
-    <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
-      <span class="plat-pill ud-pill">Underdog</span>
-      <span class="ysc-label" style="margin-bottom:0;">3-Pick · 6.5x</span>
-    </div>
-    <div class="ysc-value" id="ysUD3">—</div>
-    <div class="ysc-sub">need 15.4% BE</div>
-  </div>
-</div>
-
 <div class="layout">
 
-  <!-- ── Tracker (left) ── -->
+  <!-- ── Tracker panel (left) ── -->
   <div class="tracker-panel">
 
-    <!-- View toggle bar -->
-    <div class="view-toggle-bar">
-      <div class="vt-tabs">
-        <button class="vt-btn active" onclick="setView('calendar')">&#9632; Calendar</button>
-        <button class="vt-btn"        onclick="setView('chart')">&#9650; Chart</button>
+    <!-- Performance Section -->
+    <div class="perf-section-t">
+      <div class="perf-row">
+        <div class="perf-title-t">Your Slip Performance</div>
+        <div class="perf-cso">
+          <div class="perf-cso-item">
+            <div class="perf-cso-label">Record</div>
+            <div class="perf-cso-val" id="pnlRecord">—</div>
+          </div>
+          <div class="perf-cso-item">
+            <div class="perf-cso-label">ROI</div>
+            <div class="perf-cso-val" id="pnlRoi">—</div>
+          </div>
+          <div class="perf-cso-item">
+            <div class="perf-cso-label">Total P&amp;L</div>
+            <div class="perf-cso-val" id="pnlMain">—</div>
+          </div>
+        </div>
       </div>
-      <div class="vt-summary" id="vtSummary"></div>
+      <div class="chart-wrap-t">
+        <svg id="trackerChart"></svg>
+      </div>
+      <p class="chart-disclaimer">*Past earnings are informational and do not predict future results.</p>
     </div>
 
-    <!-- Calendar view -->
-    <div id="calView" class="cal-container">
+    <!-- Calendar -->
+    <div class="cal-container">
       <div class="cal-header">
-        <div class="cal-month-label" id="calMonthLabel">—</div>
-        <div class="cal-nav-group">
-          <button class="cal-nav-btn" onclick="changeMonth(-1)" title="Previous month">‹</button>
-          <button class="cal-nav-btn" onclick="changeMonth(1)"  title="Next month">›</button>
+        <div class="cal-header-left">
+          <div class="cal-month-label" id="calMonthLabel">—</div>
+          <div class="cal-nav-group">
+            <button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button>
+            <button class="cal-nav-btn" onclick="changeMonth(1)">›</button>
+          </div>
         </div>
+        <div class="cal-month-profit">Total: <span id="calTotalProfit">—</span></div>
       </div>
       <div class="cal-weekdays">
         <div class="cal-weekday">Sun</div>
@@ -603,17 +545,6 @@ body {
       <div id="calDetail" style="display:none"></div>
     </div>
 
-    <!-- Chart view -->
-    <div id="chartView" style="display:none; flex:1; overflow:hidden;">
-      <div class="chart-container">
-        <div class="chart-stats-row" id="chartStatsRow"></div>
-        <div class="chart-wrap">
-          <svg id="trackerChart"></svg>
-        </div>
-        <p class="chart-disclaimer">*Past earnings are informational and do not predict future results.</p>
-      </div>
-    </div>
-
   </div>
 
   <!-- ── Side panel (Your Slips) ── -->
@@ -622,8 +553,6 @@ body {
       <div class="slips-header">
         <div class="slips-meta">
           <div class="slips-title">Your Slips</div>
-          <span id="ysHitRate" style="font-size:10px;font-weight:600;color:var(--text-4);font-family:'JetBrains Mono',monospace;"></span>
-          <span id="ysPnl"     style="font-size:10px;font-weight:600;font-family:'JetBrains Mono',monospace;"></span>
         </div>
         <div class="slips-tabs">
           <button class="stab on" id="stActive"  onclick="setSlipTab('active')">Active</button>
@@ -655,13 +584,12 @@ body {
 
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
-let yourSlips    = { active: [], settled: [] };
-let slipTab      = 'active';
-let currentView  = 'calendar';
-let calYear      = new Date().getFullYear();
-let calMonth     = new Date().getMonth();
-let selectedDay  = null;
-let settleSlip   = null;
+let yourSlips        = { active: [], settled: [] };
+let slipTab          = 'active';
+let calYear          = new Date().getFullYear();
+let calMonth         = new Date().getMonth();
+let selectedDay      = null;
+let settleSlip       = null;
 let settleLegResults = [];
 
 const PROB_THRESHOLD = { PP: 54.2, UD: 53.5 };
@@ -672,6 +600,12 @@ function probClass(p, platform) {
   return 'prob-red';
 }
 
+function parseDet(detail) {
+  const m = (detail || '').match(/^(OVER|UNDER)\s+([\d.]+)\s+(.+)$/i);
+  if (m) return { dir: m[1].toUpperCase(), line: m[2], stat: m[3].toUpperCase() };
+  return { dir: '—', line: '—', stat: detail || '—' };
+}
+
 function toast(msg, isError = false) {
   const el = document.getElementById('toast');
   el.textContent = msg;
@@ -679,70 +613,33 @@ function toast(msg, isError = false) {
   setTimeout(() => el.className = 'toast', 2500);
 }
 
-// ── View toggle ─────────────────────────────────────────────────────────────
-function setView(v) {
-  currentView = v;
-  document.querySelectorAll('.vt-btn').forEach((b, i) => {
-    b.classList.toggle('active', (i === 0 && v === 'calendar') || (i === 1 && v === 'chart'));
-  });
-  document.getElementById('calView').style.display   = v === 'calendar' ? '' : 'none';
-  document.getElementById('chartView').style.display = v === 'chart'    ? '' : 'none';
-  if (v === 'chart') renderChart();
-}
-
-// ── Stats strip ─────────────────────────────────────────────────────────────
+// ── Performance Stats ─────────────────────────────────────────────────────────
 function updateStats(d) {
-  const setYsc = (id, val, be) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = val > 0 ? `${val}%` : '—';
-    el.className   = `ysc-value ${val >= be ? 'g' : val > 0 ? 'a' : ''}`;
-  };
-  const indEl = document.getElementById('ysIndRate');
-  const ir    = d.individual_hit_rate || 0;
-  indEl.textContent = ir > 0 ? `${ir}%` : '—';
-  indEl.className   = `ysc-value ${ir >= 55 ? 'g' : ir > 0 ? 'a' : ''}`;
-  document.getElementById('ysIndRecord').textContent =
-    d.individual_total > 0 ? `${d.individual_hits} of ${d.individual_total} legs` : '— of — legs';
-  setYsc('ysPP2', d.pp_2_rate, 33.3);
-  setYsc('ysPP3', d.pp_3_rate, 16.7);
-  setYsc('ysUD2', d.ud_2_rate, 28.6);
-  setYsc('ysUD3', d.ud_3_rate, 15.4);
+  const settled     = yourSlips.settled || [];
+  const nonRefund   = settled.filter(s => s.result && s.result !== 'refund');
+  const totalProfit = nonRefund.reduce((acc, s) => acc + (s.profit != null ? parseFloat(s.profit) : 0), 0);
+  const hits        = nonRefund.filter(s => s.result.startsWith('hit')).length;
+  const misses      = nonRefund.filter(s => s.result === 'miss').length;
+  const totalStaked = nonRefund.reduce((acc, s) => acc + parseFloat(s.stake || 5), 0);
+  const roi         = totalStaked > 0 ? (totalProfit / totalStaked * 100) : null;
 
-  // Slip header
-  const hrEl = document.getElementById('ysHitRate');
-  if (hrEl) hrEl.textContent = d.total > 0 ? `${d.hit_rate}% (${d.total})` : '';
-  const pnlEl = document.getElementById('ysPnl');
-  if (pnlEl && d.total_profit != null) {
-    const p = d.total_profit;
-    pnlEl.textContent = p >= 0 ? `+$${p.toFixed(2)}` : `-$${Math.abs(p).toFixed(2)}`;
-    pnlEl.style.color = p > 0 ? 'var(--green)' : p < 0 ? 'var(--red)' : 'var(--text-4)';
+  const mainEl = document.getElementById('pnlMain');
+  if (mainEl) {
+    mainEl.textContent = nonRefund.length ? `${totalProfit >= 0 ? '+' : ''}$${Math.abs(totalProfit).toFixed(2)}` : '—';
+    mainEl.className   = 'perf-cso-val' + (totalProfit > 0 ? ' pos' : totalProfit < 0 ? ' neg' : '');
   }
 
-  // Top-bar summary
-  const vtEl = document.getElementById('vtSummary');
-  if (vtEl && d.total_profit != null) {
-    const p = d.total_profit;
-    const pStr = p >= 0 ? `+$${p.toFixed(2)}` : `-$${Math.abs(p).toFixed(2)}`;
-    const pClass = p >= 0 ? 'pos' : 'neg';
-    vtEl.innerHTML = `
-      <div class="vt-stat">
-        <span class="vt-stat-val ${pClass}">${pStr}</span>
-        <span class="vt-stat-lbl">P&amp;L</span>
-      </div>
-      <div class="vt-stat">
-        <span class="vt-stat-val">${d.hit_rate || 0}%</span>
-        <span class="vt-stat-lbl">Slip Rate</span>
-      </div>
-      <div class="vt-stat">
-        <span class="vt-stat-val">${d.total || 0}</span>
-        <span class="vt-stat-lbl">Settled</span>
-      </div>`;
+  const recEl = document.getElementById('pnlRecord');
+  if (recEl) recEl.textContent = nonRefund.length ? `${hits}W-${misses}L` : '—';
+
+  const roiEl = document.getElementById('pnlRoi');
+  if (roiEl) {
+    roiEl.textContent = roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—';
+    roiEl.className   = 'perf-cso-val' + (roi > 0 ? ' pos' : roi < 0 ? ' neg' : '');
   }
 }
 
-// ── Calendar ────────────────────────────────────────────────────────────────
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+// ── Calendar ─────────────────────────────────────────────────────────────────
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function changeMonth(delta) {
@@ -755,181 +652,123 @@ function changeMonth(delta) {
 }
 
 function renderCalendar() {
-  document.getElementById('calMonthLabel').textContent = `${MONTHS[calMonth]} ${calYear}`;
+  document.getElementById('calMonthLabel').textContent = `${MONTHS_SHORT[calMonth]} ${calYear}`;
 
-  // Build day maps from slip data
-  const dayMap    = {}; // settled slips by created_at date
-  const activeMap = {}; // active slips by created_at date
+  const dayMap = {}, activeMap = {};
 
   (yourSlips.settled || []).forEach(s => {
-    const dateStr = (s.created_at || '').split(' ')[0];
-    if (!dateStr) return;
-    if (!dayMap[dateStr]) dayMap[dateStr] = { slips: [], profit: 0, hits: 0, misses: 0 };
-    dayMap[dateStr].slips.push(s);
-    if (s.profit != null && s.result !== 'refund') {
-      dayMap[dateStr].profit += parseFloat(s.profit);
-    }
-    if (s.result && s.result.startsWith('hit')) dayMap[dateStr].hits++;
-    else if (s.result === 'miss') dayMap[dateStr].misses++;
+    const ds = (s.created_at || '').split(' ')[0];
+    if (!ds) return;
+    if (!dayMap[ds]) dayMap[ds] = { slips: [], profit: 0, hits: 0, misses: 0 };
+    dayMap[ds].slips.push(s);
+    if (s.profit != null && s.result !== 'refund') dayMap[ds].profit += parseFloat(s.profit);
+    if (s.result && s.result.startsWith('hit')) dayMap[ds].hits++;
+    else if (s.result === 'miss') dayMap[ds].misses++;
   });
-
   (yourSlips.active || []).forEach(s => {
-    const dateStr = (s.created_at || '').split(' ')[0];
-    if (!dateStr) return;
-    if (!activeMap[dateStr]) activeMap[dateStr] = [];
-    activeMap[dateStr].push(s);
+    const ds = (s.created_at || '').split(' ')[0];
+    if (!ds) return;
+    if (!activeMap[ds]) activeMap[ds] = [];
+    activeMap[ds].push(s);
   });
 
-  const firstDay     = new Date(calYear, calMonth, 1).getDay();
-  const daysInMonth  = new Date(calYear, calMonth + 1, 0).getDate();
-  const today        = new Date();
-  const isThisMonth  = today.getFullYear() === calYear && today.getMonth() === calMonth;
-
-  let html = '';
-
-  // Leading empty cells
-  for (let i = 0; i < firstDay; i++) {
-    html += '<div class="cal-day cal-empty"></div>';
+  const monthPrefix  = `${calYear}-${String(calMonth + 1).padStart(2, '0')}`;
+  let monthTotal = 0;
+  for (const [ds, d] of Object.entries(dayMap)) {
+    if (ds.startsWith(monthPrefix)) monthTotal += d.profit;
+  }
+  const profEl = document.getElementById('calTotalProfit');
+  if (profEl) {
+    if (Object.keys(dayMap).some(ds => ds.startsWith(monthPrefix))) {
+      profEl.textContent = `${monthTotal >= 0 ? '+' : '-'}$${Math.abs(monthTotal).toFixed(2)}`;
+      profEl.className   = monthTotal >= 0 ? 'pos' : 'neg';
+    } else {
+      profEl.textContent = '—'; profEl.className = '';
+    }
   }
 
+  const firstDay    = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const today       = new Date();
+  const isThisMonth = today.getFullYear() === calYear && today.getMonth() === calMonth;
+
+  let html = '';
+  for (let i = 0; i < firstDay; i++) html += '<div class="cal-day cal-empty"></div>';
+
   for (let d = 1; d <= daysInMonth; d++) {
-    const mm      = String(calMonth + 1).padStart(2, '0');
-    const dd      = String(d).padStart(2, '0');
-    const dateStr = `${calYear}-${mm}-${dd}`;
+    const mm  = String(calMonth + 1).padStart(2, '0');
+    const dd  = String(d).padStart(2, '0');
+    const ds  = `${calYear}-${mm}-${dd}`;
     const isToday = isThisMonth && today.getDate() === d;
-    const dayData = dayMap[dateStr];
-    const activeDaySlips = activeMap[dateStr];
-    const isSel   = selectedDay === dateStr;
+    const dayData = dayMap[ds];
+    const activeDay = activeMap[ds];
+    const isSel = selectedDay === ds;
 
-    let colorClass = '';
-    let innerHtml  = '';
-    let dotClass   = '';
-
+    let colorClass = '', innerHtml = '';
     if (dayData && dayData.slips.length > 0) {
       const p = dayData.profit;
       colorClass = p > 0.005 ? 'cal-win' : p < -0.005 ? 'cal-loss' : 'cal-push';
-      dotClass   = p > 0.005 ? 'win'     : p < -0.005 ? 'loss'     : '';
-      const pStr = p >= 0
-        ? `+$${p.toFixed(2)}`
-        : `-$${Math.abs(p).toFixed(2)}`;
-      const pClass = p >= 0 ? 'pos' : 'neg';
-      innerHtml = `
-        <div class="cal-day-pnl ${pClass}">${pStr}</div>
-        <div class="cal-day-record">${dayData.hits}W ${dayData.misses}L</div>`;
-    } else if (activeDaySlips && activeDaySlips.length > 0) {
+      const pColor = p > 0.005 ? 'var(--green)' : p < -0.005 ? 'var(--red)' : 'rgba(255,255,255,0.6)';
+      const pSign  = p > 0.005 ? '+' : p < -0.005 ? '-' : '';
+      innerHtml = `<div class="cal-day-pnl" style="color:${pColor}">${pSign}$${Math.abs(p) < 1 ? Math.abs(p).toFixed(2) : Math.round(Math.abs(p))}</div>`;
+    } else if (activeDay && activeDay.length > 0) {
       colorClass = 'cal-active-day';
-      dotClass   = 'active';
-      innerHtml  = `<div class="cal-day-record" style="color:var(--amber)">${activeDaySlips.length} active</div>`;
+      innerHtml  = `<div class="cal-day-pnl active-label">${activeDay.length} active</div>`;
     }
 
-    const classes = ['cal-day', colorClass, isToday ? 'cal-today' : '', isSel ? 'cal-selected' : '']
-      .filter(Boolean).join(' ');
-
-    html += `<div class="${classes}" onclick="selectDay('${dateStr}')">
-      <div class="cal-day-num">${d}</div>
-      ${innerHtml}
-      ${dotClass ? `<div class="cal-day-dot ${dotClass}"></div>` : ''}
-    </div>`;
+    const classes = ['cal-day', colorClass, isToday ? 'cal-today' : '', isSel ? 'cal-selected' : ''].filter(Boolean).join(' ');
+    html += `<div class="${classes}" onclick="selectDay('${ds}')"><div class="cal-day-num">${d}</div>${innerHtml}</div>`;
   }
 
   document.getElementById('calGrid').innerHTML = html;
-
-  // Re-render detail if a day is still selected
   if (selectedDay) renderDayDetail(selectedDay);
 }
 
-function selectDay(dateStr) {
-  if (selectedDay === dateStr) {
-    selectedDay = null;
-    document.getElementById('calDetail').style.display = 'none';
-    renderCalendar();
-    return;
-  }
-  selectedDay = dateStr;
-  renderCalendar(); // re-render to update selected styling
-  renderDayDetail(dateStr);
+function selectDay(ds) {
+  if (selectedDay === ds) { selectedDay = null; document.getElementById('calDetail').style.display = 'none'; renderCalendar(); return; }
+  selectedDay = ds;
+  renderCalendar();
+  renderDayDetail(ds);
 }
 
-function renderDayDetail(dateStr) {
+function renderDayDetail(ds) {
   const detailEl = document.getElementById('calDetail');
-
-  // Collect slips for this day (both settled and active)
   const allSlips = [
-    ...(yourSlips.settled || []).filter(s => (s.created_at || '').startsWith(dateStr)),
-    ...(yourSlips.active  || []).filter(s => (s.created_at || '').startsWith(dateStr)),
+    ...(yourSlips.settled || []).filter(s => (s.created_at || '').startsWith(ds)),
+    ...(yourSlips.active  || []).filter(s => (s.created_at || '').startsWith(ds)),
   ];
-
-  const [y, m, d] = dateStr.split('-');
+  const [y, m, d] = ds.split('-');
   const label = `${MONTHS_SHORT[parseInt(m) - 1]} ${parseInt(d)}, ${y}`;
 
-  if (!allSlips.length) {
-    detailEl.style.display = 'none';
-    return;
-  }
+  if (!allSlips.length) { detailEl.style.display = 'none'; return; }
 
-  // Calculate day totals
-  const settled = allSlips.filter(s => s.result);
+  const settled   = allSlips.filter(s => s.result);
   const dayProfit = settled.reduce((acc, s) => acc + (s.profit != null && s.result !== 'refund' ? parseFloat(s.profit) : 0), 0);
   const dayHits   = settled.filter(s => s.result && s.result.startsWith('hit')).length;
   const dayMisses = settled.filter(s => s.result === 'miss').length;
-
   const profStr   = dayProfit >= 0
     ? `<span style="color:var(--green)">+$${dayProfit.toFixed(2)}</span>`
     : `<span style="color:var(--red)">-$${Math.abs(dayProfit).toFixed(2)}</span>`;
-  const summaryParts = [];
-  if (settled.length)  summaryParts.push(`${dayHits}W ${dayMisses}L`);
-  if (allSlips.filter(s => !s.result).length) summaryParts.push(`${allSlips.filter(s => !s.result).length} active`);
+  const sp = [];
+  if (settled.length)              sp.push(`${dayHits}W ${dayMisses}L`);
+  if (allSlips.filter(s=>!s.result).length) sp.push(`${allSlips.filter(s=>!s.result).length} active`);
 
   const slipsHtml = allSlips.map(s => {
     const platCls = s.platform === 'PP' ? 'pp' : 'ud';
-    let resultHtml = '';
-    if (s.result) {
-      const rColor = s.result.startsWith('hit') ? 'var(--green)' : s.result === 'miss' ? 'var(--red)' : 'var(--text-4)';
-      const profitStr = s.profit != null
-        ? ` · ${s.profit >= 0 ? '+' : ''}$${parseFloat(s.profit).toFixed(2)}`
-        : '';
-      resultHtml = `<span class="cal-slip-result-badge" style="color:${rColor}">${s.result.toUpperCase()}${profitStr}</span>`;
-    } else {
-      resultHtml = `<span style="font-size:10px;color:var(--amber);font-family:'JetBrains Mono',monospace;">ACTIVE</span>`;
-    }
-
+    let resultHtml = s.result
+      ? `<span class="cal-slip-result-badge" style="color:${s.result.startsWith('hit')?'var(--green)':s.result==='miss'?'var(--red)':'var(--text-4)'}">${s.result.toUpperCase()}${s.profit!=null?` · ${s.profit>=0?'+':''}$${parseFloat(s.profit).toFixed(2)}`:''}</span>`
+      : `<span style="font-size:10px;color:var(--amber);font-family:'JetBrains Mono',monospace;">ACTIVE</span>`;
     const legsHtml = s.players.map((p, i) => {
       const lr = s.leg_results ? s.leg_results[i] : null;
-      const lrClass = lr === 'hit' ? 'hit' : lr === 'miss' ? 'miss' : '';
-      const sym = lr === 'hit' ? ' ✓' : lr === 'miss' ? ' ✗' : '';
-      return `<div class="cal-slip-leg">
-        <span class="cal-slip-leg-name ${lrClass}">${p}${sym}</span>
-        <span class="cal-slip-leg-detail">${s.details[i]}</span>
-      </div>`;
+      const lrC = lr==='hit'?'hit':lr==='miss'?'miss':'';
+      const sym = lr==='hit'?' ✓':lr==='miss'?' ✗':'';
+      return `<div class="cal-slip-leg"><span class="cal-slip-leg-name ${lrC}">${p}${sym}</span><span class="cal-slip-leg-detail">${s.details[i]}</span></div>`;
     }).join('');
-
-    return `<div class="cal-slip ${platCls}">
-      <div class="cal-slip-head">
-        <div class="cal-slip-left">
-          <span class="ptag-sm ${platCls}">${s.platform}</span>
-          <span class="cal-slip-type">${s.type}</span>
-          ${resultHtml}
-        </div>
-        <div style="text-align:right">
-          <div class="cal-slip-pnl">EV ${s.ev_pct != null ? (s.ev_pct >= 0 ? '+' : '') + parseFloat(s.ev_pct).toFixed(1) + '%' : '—'}</div>
-        </div>
-      </div>
-      <div class="cal-slip-legs">${legsHtml}</div>
-    </div>`;
+    return `<div class="cal-slip ${platCls}"><div class="cal-slip-head"><div class="cal-slip-left"><span class="ptag-sm ${platCls}">${s.platform}</span><span class="cal-slip-type">${s.type}</span>${resultHtml}</div><div class="cal-slip-pnl">EV ${s.ev_pct!=null?(s.ev_pct>=0?'+':'')+parseFloat(s.ev_pct).toFixed(1)+'%':'—'}</div></div><div class="cal-slip-legs">${legsHtml}</div></div>`;
   }).join('');
 
   detailEl.style.display = 'block';
-  detailEl.innerHTML = `
-    <div class="cal-detail">
-      <div class="cal-detail-header">
-        <div class="cal-detail-date">${label}</div>
-        <div class="cal-detail-summary">${summaryParts.join(' · ')} &nbsp; ${settled.length ? profStr : ''}</div>
-        <button class="cal-detail-close" onclick="closeDetail()">✕</button>
-      </div>
-      <div class="cal-detail-body">
-        ${slipsHtml || '<div class="cal-detail-empty">No slips this day</div>'}
-      </div>
-    </div>`;
+  detailEl.innerHTML = `<div class="cal-detail"><div class="cal-detail-header"><div class="cal-detail-date">${label}</div><div class="cal-detail-summary">${sp.join(' · ')} &nbsp;${settled.length?profStr:''}</div><button class="cal-detail-close" onclick="closeDetail()">✕</button></div><div class="cal-detail-body">${slipsHtml||'<div class="cal-detail-empty">No slips this day</div>'}</div></div>`;
 }
 
 function closeDetail() {
@@ -938,44 +777,20 @@ function closeDetail() {
   renderCalendar();
 }
 
-// ── Chart ────────────────────────────────────────────────────────────────────
+// ── Chart (matches Autopilot structure) ──────────────────────────────────────
 function renderChart() {
   const settled = yourSlips.settled || [];
-
-  // Chart stats row
-  const totalProfit = settled.reduce((acc, s) => acc + (s.profit != null && s.result !== 'refund' ? parseFloat(s.profit) : 0), 0);
-  const hits        = settled.filter(s => s.result && s.result.startsWith('hit')).length;
-  const total       = settled.filter(s => s.result && s.result !== 'refund').length;
-  const hitRate     = total > 0 ? (hits / total * 100).toFixed(1) : '—';
-  const pClass      = totalProfit >= 0 ? 'pos' : 'neg';
-  const pStr        = totalProfit >= 0 ? `+$${totalProfit.toFixed(2)}` : `-$${Math.abs(totalProfit).toFixed(2)}`;
-
-  document.getElementById('chartStatsRow').innerHTML = `
-    <div class="chart-stat">
-      <div class="chart-stat-val ${pClass}">${pStr}</div>
-      <div class="chart-stat-lbl">Total P&amp;L</div>
-    </div>
-    <div class="chart-stat">
-      <div class="chart-stat-val">${hitRate}${hitRate !== '—' ? '%' : ''}</div>
-      <div class="chart-stat-lbl">Slip Win Rate</div>
-    </div>
-    <div class="chart-stat">
-      <div class="chart-stat-val">${hits}/${total}</div>
-      <div class="chart-stat-lbl">Slips</div>
-    </div>`;
-
-  // SVG chart
   const svg  = document.getElementById('trackerChart');
   if (!svg) return;
-  const wrap = svg.parentElement;
-  const W    = Math.max(wrap.offsetWidth || 400, 300);
-  const H    = Math.max(wrap.offsetHeight || 200, 160);
+  const rect = svg.getBoundingClientRect();
+  const W    = Math.max(rect.width || svg.parentElement.offsetWidth, 300);
+  const H    = rect.height || 200;
   const PAD  = { top: 20, right: 20, bottom: 20, left: 62 };
   const iW   = W - PAD.left - PAD.right;
   const iH   = H - PAD.top - PAD.bottom;
 
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  svg.setAttribute('width',  W);
+  svg.setAttribute('width', W);
   svg.setAttribute('height', H);
 
   if (!settled.length) {
@@ -983,80 +798,63 @@ function renderChart() {
     return;
   }
 
-  // Build cumulative dollar P&L sorted by settled_at or created_at
-  const sorted = [...settled]
-    .filter(s => s.settled_at || s.created_at)
-    .sort((a, b) => {
-      const da = a.settled_at || a.created_at || '';
-      const db = b.settled_at || b.created_at || '';
-      return da.localeCompare(db);
-    });
+  const sorted = [...settled].filter(s => s.settled_at || s.created_at)
+    .sort((a, b) => (a.settled_at||a.created_at||'').localeCompare(b.settled_at||b.created_at||''));
 
   const pts = [{ idx: 0, val: 0 }];
   let cum = 0;
   sorted.forEach((s, i) => {
-    if (s.result && s.result !== 'refund' && s.profit != null) {
-      cum += parseFloat(s.profit);
-    }
+    if (s.result && s.result !== 'refund' && s.profit != null) cum += parseFloat(s.profit);
     pts.push({ idx: i + 1, val: cum });
   });
 
-  const maxV = Math.max(0, ...pts.map(p => p.val));
-  const minV = Math.min(0, ...pts.map(p => p.val));
+  const maxV  = Math.max(0, ...pts.map(p => p.val));
+  const minV  = Math.min(0, ...pts.map(p => p.val));
   const range = (maxV - minV) || 1;
   const n     = pts.length;
-
-  const toX = (i) => PAD.left + (i / (n - 1 || 1)) * iW;
-  const toY = (v) => PAD.top + iH - ((v - minV) / range) * iH;
+  const toX   = i => PAD.left + (i / (n - 1 || 1)) * iW;
+  const toY   = v => PAD.top + iH - ((v - minV) / range) * iH;
   const zeroY = toY(0);
 
-  const step = Math.max(1, Math.ceil(range / 4));
+  const step  = Math.max(1, Math.ceil(range / 4));
   const yVals = [];
   for (let v = Math.floor(minV / step) * step; v <= maxV + step * 0.5; v += step) {
     if (v >= minV - step * 0.1 && v <= maxV + step * 0.1) yVals.push(Math.round(v));
   }
   if (!yVals.includes(0)) yVals.push(0);
 
+  const lineColor = '#22c55e';
   const finalVal  = pts[pts.length - 1].val;
-  const lineColor = finalVal >= 0 ? '#22c55e' : '#ef4444';
-
-  const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.idx).toFixed(1)},${toY(p.val).toFixed(1)}`).join(' ');
+  const pathD = pts.map((p, i) => `${i===0?'M':'L'}${toX(p.idx).toFixed(1)},${toY(p.val).toFixed(1)}`).join(' ');
   const fillD = `${pathD} L${toX(n-1).toFixed(1)},${zeroY.toFixed(1)} L${toX(0).toFixed(1)},${zeroY.toFixed(1)} Z`;
 
   svg.innerHTML = `
     <defs>
       <linearGradient id="tcg" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%"   stop-color="${lineColor}" stop-opacity="0.22"/>
+        <stop offset="0%"   stop-color="${lineColor}" stop-opacity="0.20"/>
         <stop offset="100%" stop-color="${lineColor}" stop-opacity="0.01"/>
       </linearGradient>
-      <clipPath id="tChartClip">
-        <rect x="${PAD.left}" y="${PAD.top}" width="${iW}" height="${iH}"/>
-      </clipPath>
+      <clipPath id="tcc"><rect x="${PAD.left}" y="${PAD.top}" width="${iW}" height="${iH}"/></clipPath>
     </defs>
     ${yVals.map(v => {
       const y = toY(v).toFixed(1);
-      const isZero = v === 0;
-      const label = (v >= 0 ? '+' : '') + '$' + v;
-      return `<line x1="${PAD.left}" y1="${y}" x2="${W - PAD.right}" y2="${y}"
-        stroke="${isZero ? '#2e2e33' : '#1c1c1f'}" stroke-width="${isZero ? 1 : 0.5}"/>
-        <text x="${PAD.left - 6}" y="${(parseFloat(y) + 4).toFixed(1)}" text-anchor="end"
-          fill="#3f3f46" font-size="10" font-family="JetBrains Mono,monospace">${label}</text>`;
+      return `<line x1="${PAD.left}" y1="${y}" x2="${W-PAD.right}" y2="${y}"
+        stroke="${v===0?'#2e2e33':'#1c1c1f'}" stroke-width="${v===0?1:0.5}"/>
+        <text x="${PAD.left-6}" y="${(parseFloat(y)+4).toFixed(1)}" text-anchor="end"
+          fill="#3f3f46" font-size="10" font-family="JetBrains Mono,monospace">${v>=0?'+':''}$${v}</text>`;
     }).join('')}
-    <path d="${fillD}" fill="url(#tcg)" clip-path="url(#tChartClip)"/>
+    <path d="${fillD}" fill="url(#tcg)" clip-path="url(#tcc)"/>
     <path d="${pathD}" fill="none" stroke="${lineColor}" stroke-width="1.8"
-      stroke-linejoin="round" stroke-linecap="round" clip-path="url(#tChartClip)"/>
-    <circle cx="${toX(n-1).toFixed(1)}" cy="${toY(finalVal).toFixed(1)}" r="3.5" fill="${lineColor}"
-      stroke="#0f0f11" stroke-width="1.5"/>
+      stroke-linejoin="round" stroke-linecap="round" clip-path="url(#tcc)"/>
+    <circle cx="${toX(n-1).toFixed(1)}" cy="${toY(finalVal).toFixed(1)}" r="3.5"
+      fill="${lineColor}" stroke="#0f0f11" stroke-width="1.5"/>
   `;
 }
 
 let _chartResize;
-window.addEventListener('resize', () => {
-  clearTimeout(_chartResize);
-  _chartResize = setTimeout(() => { if (currentView === 'chart') renderChart(); }, 120);
-});
+window.addEventListener('resize', () => { clearTimeout(_chartResize); _chartResize = setTimeout(renderChart, 120); });
 
-// ── Slips panel ──────────────────────────────────────────────────────────────
+// ── Slips panel ───────────────────────────────────────────────────────────────
 function setSlipTab(tab) {
   slipTab = tab;
   document.getElementById('stActive').className  = 'stab' + (tab === 'active'  ? ' on' : '');
@@ -1076,86 +874,94 @@ function renderSlips() {
   }
 
   el.innerHTML = list.map(s => {
+    const platCls  = s.platform === 'PP' ? 'pp' : 'ud';
+    const resultCls = s.result ? (s.result.startsWith('hit') ? 'hit' : s.result === 'miss' ? 'miss' : '') : '';
     const evPct    = s.ev_pct != null ? `${s.ev_pct > 0 ? '+' : ''}${parseFloat(s.ev_pct).toFixed(1)}%` : '—';
-    const evDollar = s.ev != null
-      ? (s.ev >= 0 ? `+$${parseFloat(s.ev).toFixed(2)}` : `-$${Math.abs(parseFloat(s.ev)).toFixed(2)}`)
-      : '—';
-    const evClass = (s.ev_pct != null && s.ev_pct >= 0) ? 'ev-p' : 'ev-n';
+    const evClass  = s.ev_pct != null && s.ev_pct >= 0 ? 'pos' : 'neg';
 
-    const legs = s.players.map((p, i) => {
+    const legRows = s.players.map((p, i) => {
+      const det   = parseDet(s.details[i]);
       const prob  = s.current_probs[i];
       const added = s.added_probs[i];
       const diff  = parseFloat((prob - added).toFixed(1));
       const dc    = diff > 0 ? 'up' : diff < 0 ? 'dn' : 'fl';
       const ds    = diff > 0 ? `↑${diff}%` : diff < 0 ? `↓${Math.abs(diff)}%` : '→';
       const lr    = s.leg_results ? s.leg_results[i] : null;
-      const lrClass = lr === 'hit' ? 'hit' : lr === 'miss' ? 'miss' : lr === 'void' ? 'void' : '';
-      const sym   = lr === 'hit' ? ' ✓' : lr === 'miss' ? ' ✗' : lr === 'void' ? ' ∅' : '';
-      return `<div class="si-leg">
-        <div class="si-leg-left">
-          <div class="leg-num-sm ${lrClass}">${i + 1}</div>
-          <span class="leg-name ${lrClass}">${p}${sym}</span>
-          <span class="leg-detail-txt">${s.details[i]}</span>
+      const lrCls = lr === 'hit' ? 'hit' : lr === 'miss' ? 'miss' : lr === 'void' ? 'void' : '';
+      return `<div class="dg-row ${lrCls}">
+        <div class="dg-pcol">
+          <div class="dg-pname ${lrCls}">${p}</div>
+          <div class="dg-pprob">
+            <span class="${probClass(prob, s.platform)}">${prob}%</span>
+            <span class="psc-delta ${dc}">${ds}</span>
+          </div>
         </div>
-        <div class="leg-prob-right">
-          <span class="leg-prob-val ${probClass(prob, s.platform)}">${prob}%</span>
-          <span class="leg-delta ${dc}">${ds}</span>
-        </div>
+        <div class="dg-stat"><span class="dg-stat-name">${det.stat}</span></div>
+        <div class="dg-line"><span class="dg-lineval">${det.line}</span></div>
+        <div class="dg-ou"><div class="dg-btn on ${lrCls}">${det.dir}</div></div>
       </div>`;
     }).join('');
 
-    let resultBadge = '';
+    let footerHtml;
     if (s.result) {
-      const rColor = s.result.startsWith('hit') ? 'var(--green)' : s.result === 'miss' ? 'var(--red)' : 'var(--text-4)';
-      const profit = s.profit != null ? ` · ${s.profit >= 0 ? '+' : ''}$${parseFloat(s.profit).toFixed(2)}` : '';
-      resultBadge = `<span style="font-size:11px;font-weight:600;color:${rColor}">${s.result.toUpperCase()}${profit}</span>`;
+      const profit = s.profit != null
+        ? ` · ${s.profit >= 0 ? '+' : '-'}$${Math.abs(parseFloat(s.profit)).toFixed(2)}`
+        : '';
+      footerHtml = `<div class="dg-footer">
+        <span class="dg-result ${resultCls}">${s.result.toUpperCase()}${profit}</span>
+        <button class="settle-btn" onclick="event.stopPropagation();openSettle(${s.id})">⚙ Settle</button>
+      </div>`;
+    } else {
+      footerHtml = `<div class="dg-footer">
+        <span class="dg-active-badge">ACTIVE</span>
+        <button class="settle-btn" onclick="event.stopPropagation();openSettle(${s.id})">⚙ Settle</button>
+      </div>`;
     }
 
-    const platCls = s.platform === 'PP' ? 'pp' : 'ud';
-    return `<div class="slip-item ${platCls}">
-      <div class="si-head">
-        <div class="si-left">
-          <span class="ptag-sm ${platCls}">${s.platform}</span>
-          <span class="si-type">${s.type}</span>
-          <span class="si-jp">JP ${s.joint_prob}%</span>
-          ${resultBadge}
-          <button class="settle-btn" onclick="event.stopPropagation();openSettle(${s.id})">⚙ Settle</button>
+    return `<div class="dg-card ${platCls} ${resultCls}">
+      <div class="dg-body">
+        <div class="dg-plat">
+          <img src="/static/${platCls}_logo.png" alt="${s.platform}">
+          <div class="dg-stake">$${s.stake}</div>
+          <div class="dg-type-lbl">${s.type}</div>
         </div>
-        <div style="text-align:right">
-          <div class="si-ev-pct ${evClass}">${evPct} EV</div>
-          <div class="si-ev-dollar">$${s.stake} · ${evDollar}</div>
+        <div class="dg-tbl">
+          <div class="dg-hrow">
+            <div class="dg-th">Player</div>
+            <div class="dg-th">Stat</div>
+            <div class="dg-th">Line</div>
+            <div class="dg-th">Pick</div>
+          </div>
+          ${legRows}
+        </div>
+        <div class="dg-ev">
+          <div class="dg-ev-val ${evClass}">${evPct}</div>
+          <div class="dg-ev-lbl">% EV</div>
         </div>
       </div>
-      <div class="si-legs">${legs}</div>
+      ${footerHtml}
     </div>`;
   }).join('');
 }
 
-// ── Settle modal ─────────────────────────────────────────────────────────────
+// ── Settle modal ──────────────────────────────────────────────────────────────
 const PAYOUTS = { PP: {2: 3.0, 3: 6.0}, UD: {2: 3.5, 3: 6.5} };
 
 function openSettle(slipId) {
   const all  = [...yourSlips.active, ...yourSlips.settled];
   settleSlip = all.find(s => s.id === slipId);
   if (!settleSlip) return;
-
-  settleLegResults = settleSlip.leg_results
-    ? [...settleSlip.leg_results]
-    : settleSlip.players.map(() => null);
-
-  document.getElementById('modalTitle').textContent =
-    `Settle · ${settleSlip.platform} ${settleSlip.type}`;
-
+  settleLegResults = settleSlip.leg_results ? [...settleSlip.leg_results] : settleSlip.players.map(() => null);
+  document.getElementById('modalTitle').textContent = `Settle · ${settleSlip.platform} ${settleSlip.type}`;
   document.getElementById('modalLegs').innerHTML = settleSlip.players.map((p, i) => `
     <div class="modal-leg" id="mleg-${i}">
       <span class="modal-leg-name">${p} — ${settleSlip.details[i]}</span>
       <div class="leg-btns">
-        <button class="leg-btn hit  ${settleLegResults[i]==='hit'  ? 'sel':''}" onclick="setLeg(${i},'hit')">HIT</button>
-        <button class="leg-btn miss ${settleLegResults[i]==='miss' ? 'sel':''}" onclick="setLeg(${i},'miss')">MISS</button>
-        <button class="leg-btn void ${settleLegResults[i]==='void' ? 'sel':''}" onclick="setLeg(${i},'void')">VOID</button>
+        <button class="leg-btn hit  ${settleLegResults[i]==='hit' ?'sel':''}" onclick="setLeg(${i},'hit')">HIT</button>
+        <button class="leg-btn miss ${settleLegResults[i]==='miss'?'sel':''}" onclick="setLeg(${i},'miss')">MISS</button>
+        <button class="leg-btn void ${settleLegResults[i]==='void'?'sel':''}" onclick="setLeg(${i},'void')">VOID</button>
       </div>
     </div>`).join('');
-
   updateModalResult();
   document.getElementById('settleModal').classList.add('open');
 }
@@ -1171,20 +977,18 @@ function setLeg(i, val) {
 
 function calcSettleResult() {
   if (settleLegResults.some(r => r === null)) return null;
-  const s        = settleSlip;
-  const stake    = parseFloat(s.stake || 5);
-  const platform = s.platform;
-  const n        = settleLegResults.length;
-  const hits     = settleLegResults.filter(r => r === 'hit').length;
-  const misses   = settleLegResults.filter(r => r === 'miss').length;
-  const voids    = settleLegResults.filter(r => r === 'void').length;
-  const active   = n - voids;
-
+  const s      = settleSlip;
+  const stake  = parseFloat(s.stake || 5);
+  const n      = settleLegResults.length;
+  const hits   = settleLegResults.filter(r => r === 'hit').length;
+  const misses = settleLegResults.filter(r => r === 'miss').length;
+  const voids  = settleLegResults.filter(r => r === 'void').length;
+  const active = n - voids;
   if (misses > 0)      return { result: 'miss',   payout: 0, profit: -stake };
   if (voids === n)     return { result: 'refund',  payout: stake, profit: 0 };
   if (hits === active) {
     const result = voids > 0 ? 'hit-2' : 'hit';
-    const mult   = (PAYOUTS[platform] || {})[active] || 1;
+    const mult   = (PAYOUTS[s.platform] || {})[active] || 1;
     const payout = Math.round(stake * mult * 100) / 100;
     return { result, payout, profit: Math.round((payout - stake) * 100) / 100 };
   }
@@ -1220,29 +1024,25 @@ async function confirmSettle() {
   } catch { alert('Network error'); }
 }
 
-document.getElementById('settleModal').addEventListener('click', function(e) {
-  if (e.target === this) closeSettle();
-});
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && document.getElementById('settleModal').classList.contains('open')) closeSettle();
-});
+document.getElementById('settleModal').addEventListener('click', function(e) { if (e.target === this) closeSettle(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('settleModal').classList.contains('open')) closeSettle(); });
 
-// ── Data fetch ────────────────────────────────────────────────────────────────
+// ── Data fetch ─────────────────────────────────────────────────────────────────
 async function fetchData() {
   try {
-    const d = await (await fetch('/api/your-slips')).json();
+    const d   = await (await fetch('/api/your-slips')).json();
     yourSlips = { active: d.active || [], settled: d.settled || [] };
     updateStats(d);
+    renderChart();
     renderCalendar();
     renderSlips();
-    if (currentView === 'chart') renderChart();
   } catch {
     document.getElementById('slipsBody').innerHTML =
       '<div class="empty"><div class="e-title">Connection error</div></div>';
   }
 }
 
-// ── Nav page transition ──────────────────────────────────────────────────────
+// ── Nav transition ──────────────────────────────────────────────────────────
 document.querySelectorAll('.nav-link').forEach(link => {
   link.addEventListener('click', e => {
     if (link.href === window.location.href) return;
@@ -1252,9 +1052,9 @@ document.querySelectorAll('.nav-link').forEach(link => {
   });
 });
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
+// ── Boot ────────────────────────────────────────────────────────────────────
 fetchData();
-setInterval(fetchData, 120000); // refresh every 2 minutes
+setInterval(fetchData, 120000);
 </script>
 </body>
 </html>

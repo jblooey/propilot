@@ -3,7 +3,8 @@ from underdog import get_ud_props
 from draftkings import get_dk_props
 from pinnacle import get_pinnacle_props
 from oddsapi import get_oddsapi_props
-from scipy.stats import norm
+from scipy.stats import norm, poisson
+from scipy.optimize import brentq
 from datetime import datetime, timezone
 
 STAT_KEY_MAP = {
@@ -201,6 +202,7 @@ def flatten_pp_mlb_props(pp_mlb_props: list) -> list:
                 continue  # unknown stat — no sigma, skip
             flat.append({
                 "player":      p["name"],
+                "team":        p.get("team", ""),   # PP API provides team abbreviation
                 "stat":        stat_key,
                 "line":        float(line),
                 "over_price":  None,
@@ -367,9 +369,44 @@ def devig_additive(over_dec, under_dec):
     return over_imp - (vig / 2)
 
 
+# ── Poisson line adjustment (for discrete count stats like 3PM) ───────────────
+
+# Stats where outcomes are non-negative integers — Poisson fits better than Gaussian.
+POISSON_STATS = {"threes"}
+
+def _poisson_line_adjust(avg_prob, avg_line, platform_line):
+    """
+    Given sportsbook over-probability avg_prob at avg_line, return the adjusted
+    over/under probability at platform_line using a Poisson model.
+
+    For half-point lines (e.g. 3.5): OVER 3.5 = P(X >= 4), UNDER 3.5 = P(X <= 3).
+    For whole-number lines (e.g. 3.0): exactly hitting the line is a push/void on PP/UD.
+      OVER 3.0 = P(X >= 4), UNDER 3.0 = P(X <= 2) — push at X=3 excluded from both.
+    Returns (adj_over, adj_under) or (None, None) on failure.
+    """
+    import math
+    sb_k      = math.floor(avg_line)
+    plat_k    = math.floor(platform_line)
+    is_whole  = (platform_line % 1 == 0)
+
+    try:
+        target = max(1e-6, min(1 - 1e-6, 1.0 - avg_prob))
+        lam = brentq(lambda l: poisson.cdf(sb_k, l) - target, 1e-4, 200.0)
+        adj_over = float(1 - poisson.cdf(plat_k, lam))   # P(X >= plat_k+1)
+        if is_whole:
+            # Whole-number line: push at X == plat_k returns stake, not a win.
+            # Under wins only on P(X <= plat_k-1); using complement inflates it by P(X=plat_k).
+            adj_under = float(poisson.cdf(plat_k - 1, lam))  # P(X <= plat_k-1)
+        else:
+            adj_under = 1.0 - adj_over  # half-point: no push possible
+        return max(0.01, min(0.99, adj_over)), max(0.01, min(0.99, adj_under))
+    except Exception:
+        return None, None
+
+
 # ── Weighted consensus ────────────────────────────────────────────────────────
 
-def weighted_consensus(stat_data, platform_line, sigma):
+def weighted_consensus(stat_data, platform_line, sigma, use_poisson=False):
     other_books = {k: v for k, v in stat_data.items()
                    if k not in ("pinnacle", "underdog", "prizepicks")}
     if other_books and "pinnacle" in stat_data:
@@ -404,7 +441,18 @@ def weighted_consensus(stat_data, platform_line, sigma):
     avg_line = weighted_line / total_weight
 
     line_diff = avg_line - platform_line
-    if line_diff != 0:
+    if use_poisson:
+        # Always run Poisson adjustment so whole-number platform lines correctly
+        # exclude push probability from adj_under (even when line_diff == 0).
+        adj_over_prob, adj_under_prob = _poisson_line_adjust(avg_prob, avg_line, platform_line)
+        if adj_over_prob is None:  # fallback to Gaussian on solver failure
+            if line_diff != 0:
+                z = line_diff / sigma
+                adj_over_prob = norm.cdf(norm.ppf(avg_prob) + z)
+            else:
+                adj_over_prob = avg_prob
+            adj_under_prob = 1 - adj_over_prob
+    elif line_diff != 0:
         z              = line_diff / sigma
         adj_over_prob  = norm.cdf(norm.ppf(avg_prob) + z)
         adj_under_prob = 1 - adj_over_prob
@@ -444,6 +492,31 @@ def build_player_team_map():
     return player_team
 
 
+def build_mlb_player_team_map():
+    """Build player → team abbreviation map from ESPN MLB rosters."""
+    import requests
+    player_team = {}
+    try:
+        r     = requests.get("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams", timeout=10)
+        teams = r.json().get("sports", [{}])[0].get("leagues", [{}])[0].get("teams", [])
+        for team_entry in teams:
+            team    = team_entry["team"]
+            abbr    = team["abbreviation"]
+            team_id = team["id"]
+            rr = requests.get(
+                f"https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams/{team_id}/roster",
+                timeout=10
+            )
+            for athlete in rr.json().get("athletes", []):
+                name = athlete.get("displayName", "")
+                if name:
+                    player_team[name.lower()] = abbr
+    except Exception as e:
+        print(f"  [MLB TeamMap] Failed: {e}")
+    print(f"  [MLB TeamMap] Built map for {len(player_team)} players")
+    return player_team
+
+
 # ── Edge finder ───────────────────────────────────────────────────────────────
 
 def find_edges(platform_props, sb_props, platform_name, ref_props=None,
@@ -467,10 +540,12 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
         platform_line = prop["line"]
         player        = prop["player"]
 
-        # Prefer team from player_team_map (ESPN-derived)
+        # Team priority: ESPN roster map → prop-level team (PP MLB) → anchor
         team = None
         if player_team_map:
             team = player_team_map.get(normalize_name(player))
+        if not team:
+            team = prop.get("team") or None
 
         # Match player to sb_props
         sb_entry = None
@@ -545,7 +620,8 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
             continue
 
         adj_over_prob, adj_under_prob, avg_line, total_weight = weighted_consensus(
-            stat_data_with_ref, platform_line, sigma
+            stat_data_with_ref, platform_line, sigma,
+            use_poisson=(stat_key in POISSON_STATS),
         )
 
         def fmt_book(book_key, direction):
@@ -603,37 +679,51 @@ def find_edges(platform_props, sb_props, platform_name, ref_props=None,
             "matchup":       anchor.get("matchup", ""),
         }
 
+        # UD implied probability from their own multiplier pricing (devigged).
+        # Only meaningful for UD edges — PP uses flat vig so mult is always 1.0.
+        def _ud_implied(direction):
+            if platform_name != "UD":
+                return None
+            over_m  = prop.get("over_mult",  1.0) or 1.0
+            under_m = prop.get("under_mult", 1.0) or 1.0
+            od = ud_decimal_for_mult(over_m)
+            ud = ud_decimal_for_mult(under_m)
+            over_p = devig_multiplicative(od, ud)
+            return round((over_p if direction == "OVER" else 1 - over_p) * 100, 1)
+
         if adj_over_prob >= min_prob:
             e = {**base_edge,
-                 "direction":  "OVER",
-                 "prob":       round(adj_over_prob * 100, 1),
-                 "ref_agrees": (ref_line <= platform_line) if ref_line is not None else None,
-                 "has_sharp":  has_sharp,
-                 "ud_mult":    prop.get("over_mult", 1.0),
-                 "ud_price":   prop.get("over_price"),
-                 "pin":        fmt_book("pinnacle",   "OVER"),
-                 "fd":         fmt_book("fanduel",    "OVER"),
-                 "dk":         fmt_book("draftkings", "OVER"),
-                 "mgm":        fmt_book("betmgm",     "OVER"),
-                 "cae":        fmt_book("caesars",    "OVER"),
-                 ref_book_key: fmt_book(ref_book_key, "OVER"),
+                 "direction":    "OVER",
+                 "prob":         round(adj_over_prob * 100, 1),
+                 "ud_prob":      _ud_implied("OVER"),
+                 "ref_agrees":   (ref_line <= platform_line) if ref_line is not None else None,
+                 "has_sharp":    has_sharp,
+                 "ud_mult":      prop.get("over_mult", 1.0),
+                 "ud_price":     prop.get("over_price"),
+                 "pin":          fmt_book("pinnacle",   "OVER"),
+                 "fd":           fmt_book("fanduel",    "OVER"),
+                 "dk":           fmt_book("draftkings", "OVER"),
+                 "mgm":          fmt_book("betmgm",     "OVER"),
+                 "cae":          fmt_book("caesars",    "OVER"),
+                 ref_book_key:   fmt_book(ref_book_key, "OVER"),
             }
             edges.append(e)
 
         if adj_under_prob >= min_prob and stat_key not in OVER_ONLY_STATS:
             e = {**base_edge,
-                 "direction":  "UNDER",
-                 "prob":       round(adj_under_prob * 100, 1),
-                 "ref_agrees": (ref_line >= platform_line) if ref_line is not None else None,
-                 "has_sharp":  has_sharp,
-                 "ud_mult":    prop.get("under_mult", 1.0),
-                 "ud_price":   prop.get("under_price"),
-                 "pin":        fmt_book("pinnacle",   "UNDER"),
-                 "fd":         fmt_book("fanduel",    "UNDER"),
-                 "dk":         fmt_book("draftkings", "UNDER"),
-                 "mgm":        fmt_book("betmgm",     "UNDER"),
-                 "cae":        fmt_book("caesars",    "UNDER"),
-                 ref_book_key: fmt_book(ref_book_key, "UNDER"),
+                 "direction":    "UNDER",
+                 "prob":         round(adj_under_prob * 100, 1),
+                 "ud_prob":      _ud_implied("UNDER"),
+                 "ref_agrees":   (ref_line >= platform_line) if ref_line is not None else None,
+                 "has_sharp":    has_sharp,
+                 "ud_mult":      prop.get("under_mult", 1.0),
+                 "ud_price":     prop.get("under_price"),
+                 "pin":          fmt_book("pinnacle",   "UNDER"),
+                 "fd":           fmt_book("fanduel",    "UNDER"),
+                 "dk":           fmt_book("draftkings", "UNDER"),
+                 "mgm":          fmt_book("betmgm",     "UNDER"),
+                 "cae":          fmt_book("caesars",    "UNDER"),
+                 ref_book_key:   fmt_book(ref_book_key, "UNDER"),
             }
             edges.append(e)
 
