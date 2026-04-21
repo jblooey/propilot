@@ -2,7 +2,7 @@ import json
 import os
 import requests
 import unicodedata
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 
 BETS_FILE    = "bets.json"
 RESULTS_FILE = "results.json"
@@ -208,6 +208,62 @@ def _get_team_abbrs_from_event(event: dict) -> set:
     return abbrs
 
 
+def _get_matchup_from_espn(team: str) -> dict:
+    """
+    Look up home_abbr, away_abbr, matchup, and game_date for a team via ESPN.
+    Returns a dict with those keys, or all empty strings if not found.
+    Uses the same _espn_schedule_cache as get_player_game_date.
+    """
+    empty = {"home_abbr": "", "away_abbr": "", "matchup": "", "game_date": ""}
+    if not team:
+        return empty
+
+    today    = date.today()
+    tomorrow = today + timedelta(days=1)
+
+    cutoff = (today - timedelta(days=1)).strftime("%Y%m%d")
+    stale = [k for k in _espn_schedule_cache if k < cutoff]
+    for k in stale:
+        del _espn_schedule_cache[k]
+
+    for check_date in [today, tomorrow]:
+        date_str = check_date.strftime("%Y%m%d")
+        if date_str in _espn_schedule_cache:
+            games = _espn_schedule_cache[date_str]
+        else:
+            games = _espn_scoreboard(date_str)
+            _espn_schedule_cache[date_str] = games
+
+        for event in games:
+            try:
+                competitors = event["competitions"][0]["competitors"]
+                abbrs = {c["team"]["abbreviation"] for c in competitors}
+                if team.upper() not in abbrs:
+                    continue
+                home_abbr, away_abbr = "", ""
+                for c in competitors:
+                    abbr = c["team"]["abbreviation"]
+                    if c.get("homeAway") == "home":
+                        home_abbr = abbr
+                    elif c.get("homeAway") == "away":
+                        away_abbr = abbr
+                if not home_abbr or not away_abbr:
+                    # fallback if homeAway missing
+                    abbr_list = list(abbrs)
+                    home_abbr = abbr_list[0]
+                    away_abbr = abbr_list[1] if len(abbr_list) > 1 else ""
+                return {
+                    "home_abbr": home_abbr,
+                    "away_abbr": away_abbr,
+                    "matchup":   f"{away_abbr} @ {home_abbr}",
+                    "game_date": check_date.isoformat(),
+                }
+            except Exception:
+                continue
+
+    return empty
+
+
 # ── ESPN MLB stat parsing ─────────────────────────────────────────────────────
 
 # Which internal stat keys belong to pitchers vs batters
@@ -291,23 +347,22 @@ def _parse_espn_mlb_stats(game_data: dict) -> tuple[dict, dict]:
                         "pitches_thrown":     safe_int(kv.get("pitches")),
                     }
                 else:
-                    # Batter — compute total_bases from slugging * AB if available
-                    at_bats  = safe_int(kv.get("atBats"))
-                    slug_str = kv.get("slugAvg", "0")
-                    try:
-                        total_bases = round(float(slug_str) * at_bats)
-                    except (ValueError, TypeError):
-                        total_bases = 0
-
-                    hits = safe_int(kv.get("hits"))
-                    runs = safe_int(kv.get("runs"))
-                    rbis = safe_int(kv.get("RBIs"))
+                    hits     = safe_int(kv.get("hits"))
+                    home_runs = safe_int(kv.get("homeRuns"))
+                    runs     = safe_int(kv.get("runs"))
+                    rbis     = safe_int(kv.get("RBIs"))
+                    # ESPN box scores lack doubles/triples; use minimum bound:
+                    # each hit is at least 1 base, each HR adds 3 extra bases.
+                    # Formula: hits + hr*3 = 1*(H-HR) + 4*HR = singles*1 + HR*4
+                    # This understates doubles/triples but is correct for HR-based
+                    # lines (e.g. UNDER 1.5 TB with 2+ hits always fires correctly).
+                    total_bases = hits + home_runs * 3
 
                     batter_stats[name.lower()] = {
                         "name":              name,
                         "hits":              hits,
                         "rbis":              rbis,
-                        "home_runs":         safe_int(kv.get("homeRuns")),
+                        "home_runs":         home_runs,
                         "runs":              runs,
                         "batter_strikeouts": safe_int(kv.get("strikeouts")),
                         "walks":             safe_int(kv.get("walks")),
@@ -383,6 +438,9 @@ _ABBR_TO_ESPN = {
     "UTA": "UTAH", # Jazz: sportsbooks sometimes use UTA, ESPN uses UTAH
     "SAS": "SA",   # Spurs: sportsbooks use SAS, ESPN uses SA
     "GS":  "GSW",  # Warriors: some books use GS, ESPN uses GSW
+    # MLB mismatches — odds-api.io returns these but ESPN uses different codes
+    "OAK": "ATH",  # Athletics: odds-api stores OAK, ESPN uses ATH
+    "CWS": "CHW",  # White Sox: odds-api stores CWS, ESPN uses CHW
 }
 
 def _normalize_abbr(abbr: str) -> str:
@@ -487,7 +545,19 @@ def add_bet(edge: dict) -> dict | None:
     away_abbr        = edge.get("away_abbr", "")
     has_anchor       = bool(home_abbr and away_abbr and anchor_game_date)
 
-    # Priority: SGO anchor date > ESPN schedule lookup > today
+    # If sportsbook anchor is missing, fall back to ESPN schedule for matchup data
+    if not has_anchor and team:
+        espn_anchor = _get_matchup_from_espn(team)
+        if espn_anchor["home_abbr"]:
+            home_abbr  = espn_anchor["home_abbr"]
+            away_abbr  = espn_anchor["away_abbr"]
+            has_anchor = True
+            if not anchor_game_date:
+                anchor_game_date = espn_anchor["game_date"]
+            print(f"  [TRACKER] ESPN matchup fallback for {edge.get('player')}: "
+                  f"{espn_anchor['matchup']} on {anchor_game_date}")
+
+    # Priority: SGO anchor date > ESPN anchor date > ESPN schedule lookup > today
     if anchor_game_date:
         game_date = anchor_game_date
     elif team:
@@ -553,12 +623,12 @@ def add_bet(edge: dict) -> dict | None:
         "line":         edge["platform_line"],
         "added_prob":   edge["prob"],
         "current_prob": edge["prob"],
-        "added_at":     datetime.now().strftime("%Y-%m-%d %I:%M %p"),
+        "added_at":     datetime.now(timezone.utc).strftime("%Y-%m-%d %I:%M %p UTC"),
         "game_date":    game_date,
         "home_abbr":    home_abbr,
         "away_abbr":    away_abbr,
         "start_time":   edge.get("start_time", ""),
-        "matchup":      edge.get("matchup", ""),
+        "matchup":      edge.get("matchup", "") or (f"{away_abbr} @ {home_abbr}" if home_abbr and away_abbr else ""),
         "anchor_ok":    has_anchor,
         "books_at_add": {
             "pin": edge["pin"], "fd": edge["fd"],
@@ -838,8 +908,8 @@ def _settle_bets_for_sport(bets, sport, scoreboard_fn, summary_fn, dates_needed)
             matched_payload = game_data.get(game_id)
 
         if matched_payload is None:
-            espn_teams  = {bet.get("home_abbr",""), bet.get("away_abbr","")} - {""}
-            bet_team    = bet.get("team", "")
+            espn_teams  = {_normalize_abbr(a) for a in [bet.get("home_abbr",""), bet.get("away_abbr","")] if a}
+            bet_team    = _normalize_abbr(bet.get("team", "")) if bet.get("team") else ""
             team_tokens = espn_teams if espn_teams else ({bet_team} if bet_team else set())
             if team_tokens:
                 for gid in completed_ids:
@@ -857,7 +927,7 @@ def _settle_bets_for_sport(bets, sport, scoreboard_fn, summary_fn, dates_needed)
                                 if ev["id"] == gid and diff <= 1:
                                     bet["result"]     = "void"
                                     bet["reason"]     = "Inactive scratch (not in box score)"
-                                    bet["settled_at"] = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+                                    bet["settled_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %I:%M %p UTC")
                                     print(f"  [VOID] {bet['player']} — inactive scratch "
                                           f"({'/'.join(sorted(team_tokens))} played)")
                                     settled += 1
@@ -870,7 +940,7 @@ def _settle_bets_for_sport(bets, sport, scoreboard_fn, summary_fn, dates_needed)
 
         bet["result"]     = result
         bet["reason"]     = reason
-        bet["settled_at"] = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+        bet["settled_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %I:%M %p UTC")
         icon = "✅" if result == "hit" else "❌" if result == "miss" else "∅"
         print(f"  [{result.upper()}] {icon} {bet['player']} {bet['direction']} "
               f"{bet['line']} {bet['stat']} | {reason} | {bet.get('matchup','?')}")
@@ -927,7 +997,7 @@ def settle_bet(bet_id: int, result: str) -> bool:
     for bet in bets:
         if bet["id"] == bet_id and bet["result"] is None:
             bet["result"]     = result
-            bet["settled_at"] = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+            bet["settled_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %I:%M %p UTC")
             save_bets(bets)
             print(f"  ✓ Bet #{bet_id} settled as {result.upper()}")
             return True
