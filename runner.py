@@ -16,7 +16,7 @@ from oddsapi import get_oddsapi_props, get_oddsapi_mlb_props
 from main import (
     build_sb_props, flatten_pp_props, flatten_pp_mlb_props,
     find_edges, print_edges,
-    build_player_team_map, names_match,
+    build_player_team_map, build_mlb_player_team_map, names_match,
     weighted_consensus, SIGMA, STAT_KEY_MAP,
 )
 from bet_tracker import (
@@ -41,12 +41,13 @@ alerted_tacos  = set()  # track which promo edges we've already notified about
 last_edges     = []
 
 # MLB fetches on a slower 20-min cycle to stay under 100 req/hour per key
-_last_mlb_fetch_at  = None
-_nba_cycle_count    = 0    # MLB fetches every 2 NBA cycles (cycles 1, 3, 5, …)
-_last_pp_mlb_props  = []
-_last_ud_mlb_props  = []
-_last_pin_mlb_props = []
+_last_mlb_fetch_at      = None
+_nba_cycle_count        = 0    # MLB fetches every 2 NBA cycles (cycles 1, 3, 5, …)
+_last_pp_mlb_props      = []
+_last_ud_mlb_props      = []
+_last_pin_mlb_props     = []
 _last_oddsapi_mlb_props = []
+_last_mlb_player_team_map = {}   # ESPN MLB roster map (built once per MLB cycle)
 
 STAT_LABEL_TO_KEY = {
     # NBA
@@ -168,6 +169,7 @@ def _should_fetch_mlb() -> bool:
 def run():
     global last_edges, _last_mlb_fetch_at, _nba_cycle_count
     global _last_pp_mlb_props, _last_ud_mlb_props, _last_pin_mlb_props, _last_oddsapi_mlb_props
+    global _last_mlb_player_team_map
     _nba_cycle_count += 1
     print(f"\n{'#'*60}")
     print(f"  RUN AT {datetime.now().strftime('%I:%M:%S %p')} (NBA cycle #{_nba_cycle_count})")
@@ -227,6 +229,9 @@ def run():
             oddsapi_mlb_props = get_oddsapi_mlb_props()
             print(f"  {len(oddsapi_mlb_props)} props")
 
+            print("Building MLB player→team map...")
+            _last_mlb_player_team_map = build_mlb_player_team_map()
+
             _last_mlb_fetch_at      = datetime.now(timezone.utc)
             _last_pp_mlb_props      = pp_mlb_props
             _last_ud_mlb_props      = ud_mlb_props
@@ -269,15 +274,17 @@ def run():
             stale_books=stale_books,
         )
 
-        # MLB edges
+        # MLB edges — pass MLB team map so players get correct team abbreviations
         pp_mlb_edges = find_edges(
             pp_mlb_flat, sb_mlb_props, "PP",
             ref_props=ud_mlb_flat,
+            player_team_map=_last_mlb_player_team_map,
             stale_books=stale_books,
         )
         ud_mlb_edges = find_edges(
             ud_mlb_flat, sb_mlb_props, "UD",
             ref_props=pp_mlb_flat,
+            player_team_map=_last_mlb_player_team_map,
             stale_books=stale_books,
         )
 
@@ -402,16 +409,22 @@ def run():
                     continue
 
                 sigma = SIGMA.get(stat_key)
+                # MLB stats need the MLB sportsbook prop dict, not the NBA one
+                from bet_tracker import MLB_PITCHER_STATS, MLB_BATTER_STATS
+                is_mlb_stat = stat_key in MLB_PITCHER_STATS or stat_key in MLB_BATTER_STATS
+                props_to_search = sb_mlb_props if is_mlb_stat else sb_props
                 sb_entry = next(
-                    (v for k, v in sb_props.items() if names_match(player, k)),
+                    (v for k, v in props_to_search.items() if names_match(player, k)),
                     None
                 )
                 if not sb_entry or not sigma:
+                    print(f"  [slip] No SB entry or sigma for {player} {stat_key} — bet_id=None")
                     collected_bet_ids.append(None)
                     continue
 
                 stat_data = sb_entry["props"].get(stat_key)
                 if not stat_data:
+                    print(f"  [slip] No SB stat data for {player} {stat_key} — bet_id=None")
                     collected_bet_ids.append(None)
                     continue
 
@@ -456,7 +469,32 @@ def run():
                     "matchup": anchor.get("matchup", ""),
                 }
                 bet = add_bet(synthetic_edge)
-                collected_bet_ids.append(bet["id"] if bet else None)
+                if bet:
+                    collected_bet_ids.append(bet["id"])
+                else:
+                    # add_bet returned None (one-bet-per-player or duplicate).
+                    # Try to find any existing active bet for this player+stat+direction+line.
+                    all_bets = load_bets()
+                    existing = next(
+                        (b for b in all_bets
+                         if b["player"]    == player
+                         and b["stat"]      == stat_key
+                         and b["direction"] == direction
+                         and b["line"]      == platform_line
+                         and b["result"]    is None),
+                        None
+                    )
+                    if not existing:
+                        # Broader fallback: match player+stat+direction regardless of line
+                        existing = next(
+                            (b for b in all_bets
+                             if b["player"]    == player
+                             and b["stat"]      == stat_key
+                             and b["direction"] == direction
+                             and b["result"]    is None),
+                            None
+                        )
+                    collected_bet_ids.append(existing["id"] if existing else None)
 
             # Link real bet IDs back to the slip
             link_bet_ids_to_slip(slip["id"], collected_bet_ids)
