@@ -530,7 +530,6 @@ body {
             <button class="cal-nav-btn" onclick="changeMonth(1)">›</button>
           </div>
         </div>
-        <div class="cal-month-profit">Total: <span id="calTotalProfit">—</span></div>
       </div>
       <div class="cal-weekdays">
         <div class="cal-weekday">Sun</div>
@@ -823,8 +822,8 @@ function renderChart() {
   }
   if (!yVals.includes(0)) yVals.push(0);
 
-  const lineColor = '#22c55e';
   const finalVal  = pts[pts.length - 1].val;
+  const lineColor = finalVal >= 0 ? '#22c55e' : '#ef4444';
   const pathD = pts.map((p, i) => `${i===0?'M':'L'}${toX(p.idx).toFixed(1)},${toY(p.val).toFixed(1)}`).join(' ');
   const fillD = `${pathD} L${toX(n-1).toFixed(1)},${zeroY.toFixed(1)} L${toX(0).toFixed(1)},${zeroY.toFixed(1)} Z`;
 
